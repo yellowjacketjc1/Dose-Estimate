@@ -1,0 +1,6 @@
+{
+  "name": "RWP Dose Estimator",
+  "description": "An application to build effective dose assessment worksheets for Radiological Work Permits (RWPs), allowing users to add tasks, define radionuclides, and calculate dose estimates based on Argonne National Laboratory's RPP-742 form.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
