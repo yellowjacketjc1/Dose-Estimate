@@ -1,65 +1,392 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RWP Dose Estimator</title>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPP-742 Task-Based Effective Dose Assessment Worksheet</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-      }
-      /* Custom scrollbar for better aesthetics */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #555;
-      }
-      /* Ensure sufficient contrast for accessibility */
-      .form-input, .form-select, .form-checkbox, .form-radio {
-        border-color: #cbd5e1; /* cool-gray-300 */
-      }
-      .form-input:focus, .form-select:focus {
-        border-color: #3b82f6; /* blue-500 */
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
-      }
-      input[type="number"]::-webkit-inner-spin-button,
-      input[type="number"]::-webkit-outer-spin-button {
-        -webkit-appearance: none;
-        margin: 0;
-      }
-      input[type="number"] {
-        -moz-appearance: textfield;
-      }
+        body { font-family: 'Inter', sans-serif; }
+        .toggle-content {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.4s ease-out;
+        }
+        .toggle-content > div {
+            overflow: hidden;
+        }
+        .toggle-content.expanded {
+            grid-template-rows: 1fr;
+        }
+        .toggle-label::after { content: "►"; display: inline-block; margin-left: 0.5rem; transition: transform 0.3s; }
+        .toggle-label.expanded::after { transform: rotate(90deg); }
+        input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type="number"] { -moz-appearance: textfield; }
+        .tab-content-pane { display: none; }
+        .tab-content-pane.active { display: block; }
+        .tab-button.active { background-color: #3b82f6; color: white; border-color: #3b82f6; }
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .printable-section, .tab-content-pane { display: block !important; page-break-before: always; }
+            .toggle-content { display: block !important; grid-template-rows: 1fr !important; }
+            .toggle-label::after, .tab-nav { display: none !important; }
+            .bg-blue-700 { background-color: #1d4ed8 !important; }
+            .text-white { color: white !important; }
+        }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^18.2.0",
-    "react/": "https://esm.sh/react@^18.2.0/",
-    "react-dom/client": "https://esm.sh/react-dom@^18.2.0/client",
-    "react-dom/": "https://esm.sh/react-dom@^18.2.0/"
-  }
-}
-</script>
-    <!-- Include Babel Standalone -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-  <body class="bg-slate-100 text-slate-800">
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!-- Update script type to text/babel and specify data-type="module" -->
-    <script type="text/babel" data-type="module" data-presets="env,react,typescript" src="./index.js"></script>
-  </body>
-</html><link rel="stylesheet" href="index.css">
-<script src="index.tsx" type="module"></script>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <header class="bg-blue-800 text-white rounded-lg shadow-lg mb-8 overflow-hidden">
+            <div class="px-6 py-4 flex justify-between items-center">
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-bold">RPP-742 Task-Based Dose Assessment</h1>
+                    <p class="text-blue-200 mt-1">Radioactive Work Planning Tool</p>
+                </div>
+                <button id="printBtn" class="px-3 py-2 bg-white text-blue-800 rounded-md hover:bg-blue-100 transition no-print">
+                    <i class="fas fa-print mr-2"></i>Print All
+                </button>
+            </div>
+        </header>
+
+        <!-- Project Information -->
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden printable-section">
+            <div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Project Information</h2></div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="projectName" placeholder="Project Name*" class="block w-full rounded-md border-gray-300 shadow-sm" required>
+                    <input type="text" id="workOrder" placeholder="Work Order Number" class="block w-full rounded-md border-gray-300 shadow-sm">
+                    <input type="text" id="location" placeholder="Location*" class="block w-full rounded-md border-gray-300 shadow-sm" required>
+                    <input type="date" id="date" class="block w-full rounded-md border-gray-300 shadow-sm" required>
+                </div>
+                <textarea id="description" rows="3" placeholder="Work Description*" class="mt-4 block w-full rounded-md border-gray-300 shadow-sm" required></textarea>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="mb-4 border-b border-gray-200 no-print">
+            <nav id="tab-nav" class="flex space-x-2 items-center" aria-label="Tabs">
+                <button id="addNewTaskBtn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"><i class="fas fa-plus mr-2"></i>Add New Task</button>
+            </nav>
+        </div>
+
+        <!-- Tab Content Area -->
+        <div id="tab-content-area">
+            <div id="empty-state" class="text-center py-16 bg-white rounded-lg shadow-md"><i class="fas fa-tasks fa-3x text-gray-400 mb-4"></i><h2 class="text-xl font-semibold text-gray-700">No Tasks Added Yet</h2><p class="text-gray-500 mt-2">Click the "Add New Task" button to begin.</p></div>
+            <div id="summary-content" class="tab-content-pane printable-section">
+                <!-- Summary Content will be populated by template -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates (Hidden) -->
+    <template id="summary-template">
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Job Summary & Totals</h2></div><div class="toggle-content expanded"><div><div class="p-6"><h3 class="text-lg font-medium text-gray-800 mb-4">Dose Summary by Task</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Workers</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ind. Dose (mrem)</th></tr></thead><tbody id="summary-table-body" class="bg-white divide-y divide-gray-200"><tr id="no-tasks-row"><td colspan="5" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr></tbody></table></div><h3 class="text-lg font-medium text-gray-800 mt-6 mb-4">Total Individual Dose Estimate</h3><div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-bold text-blue-800">Total Estimated Dose Per Individual (mrem)</label><input id="total-individual-dose-per-worker" type="text" class="mt-1 block w-full bg-blue-100 text-blue-900 font-bold text-lg rounded-md border-blue-300" readonly></div></div></div></div></div>
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Workplace Air Sampling Triggers (Overall)</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-1" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-1" class="font-medium text-gray-700">Any time a worker is likely to exceed 40 DAC-hours per year.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-2" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-2" class="font-medium text-gray-700">Any time respiratory protection devices have been prescribed.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-3" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-3" class="font-medium text-gray-700">Any time an air sample is needed to estimate internal dose.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-4" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-4" class="font-medium text-gray-700">Any time a worker’s estimated annual intake is expected to exceed 10% of the ALI or 500 mrem.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-5" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-5" class="font-medium text-gray-700">Estimated airborne concentration is expected to exceed 0.3 DAC averaged over 40 hours.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-6" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-6" class="font-medium text-gray-700">During any work or operation known or expected to cause airborne radioactivity (e.g., grinding, welding, cutting).</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-7" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-7" class="font-medium text-gray-700">During any work or operation that involves the breach of a radioactive system.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-8" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-8" class="font-medium text-gray-700">Any time the RSO or designee deems necessary.</label></div></div>
+        </div><div class="mt-6"><div class="bg-red-50 border-l-4 border-red-400 p-4 flex items-start" id="airSamplingAlert" style="display: none;"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i><p class="text-sm text-red-700"><span class="font-semibold">Air Sampling Required</span></p></div><div class="bg-green-50 border-l-4 border-green-400 p-4 flex items-start" id="noAirSamplingAlert"><i class="fas fa-check-circle text-green-500 mr-3"></i><p class="text-sm text-green-700"><span class="font-semibold">No Air Sampling Required</span></p></div></div></div></div></div></div>
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>ALARA Trigger Review (Overall)</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-1" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-1" class="font-medium text-gray-700">Non-routine or complex work.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-2" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-2" class="font-medium text-gray-700">Estimated individual total effective dose > 500 mrem per year.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-3" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-3" class="font-medium text-gray-700">Estimated individual extremity or skin dose > 5000 mrem/year.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-4" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-4" class="font-medium text-gray-700">Collective dose > 750 person-mrem per year.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-5" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-5" class="font-medium text-gray-700">Anticipated airborne radioactivity > 200 DAC-hrs or spike > 1000 DAC.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-6" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-6" class="font-medium text-gray-700">Removable contamination > 1000x Appendix D levels.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-7" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-7" class="font-medium text-gray-700">Worker likely to receive an internal dose exceeding 100 mrem.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-8" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-8" class="font-medium text-gray-700">Entry into areas with dose rates > 10 rem/hr at 30 cm.</label></div></div>
+        </div><div class="mt-6"><div class="bg-red-50 border-l-4 border-red-400 p-4 flex items-start" id="alaraAlert" style="display: none;"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i><p class="text-sm text-red-700"><span class="font-semibold">ALARA Review Required</span></p></div><div class="bg-green-50 border-l-4 border-green-400 p-4 flex items-start" id="noAlaraAlert"><i class="fas fa-check-circle text-green-500 mr-3"></i><p class="text-sm text-green-700"><span class="font-semibold">No ALARA Review Required</span></p></div></div></div></div></div></div>
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Signatures</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-8"><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Performed By</h3><div class="space-y-4"><input type="text" placeholder="Name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><input type="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div></div><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Peer Check</h3><div class="space-y-4"><input type="text" placeholder="Name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"><input type="date" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div></div></div></div></div></div></div>
+    </template>
+
+    <template id="task-template">
+        <div class="task-container tab-content-pane printable-section" data-task-id="{taskId}">
+            <div class="bg-white rounded-lg shadow-md mb-4 p-4 border-l-4 border-blue-500"><div class="flex justify-between items-center"><div class="flex-grow"><input type="text" id="task-title-{taskId}" name="task-title" class="task-title mt-1 block w-full text-lg font-semibold rounded-md border-gray-300 shadow-sm" placeholder="Enter a descriptive title for this task"></div><button class="remove-task-btn ml-4 text-red-500 hover:text-red-700 no-print"><i class="fas fa-trash-alt mr-1"></i>Remove Task</button></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label expanded" onclick="toggleSection(this)"><h2>Time Estimation</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content expanded"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-4 gap-4"><div><label class="block text-sm font-medium text-gray-700"># Workers</label><input type="number" min="1" value="1" class="workers-count mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div><label class="block text-sm font-medium text-gray-700">Hours Each</label><input type="number" min="0" step="0.1" value="1" class="hours-per-worker mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Person-Hours</label><input type="text" class="person-hours mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50" readonly></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>mPIF Calculation</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 p-4 border rounded-lg"><div><label class="block text-sm font-medium">C</label><input type="number" value="1" step="any" class="mpif-c mt-1 block w-full rounded-md"></div><div><label class="block text-sm font-medium">R</label><input type="number" value="1" step="any" class="mpif-r mt-1 block w-full rounded-md"></div><div><label class="block text-sm font-medium">D</label><input type="number" value="1" step="any" class="mpif-d mt-1 block w-full rounded-md"></div><div><label class="block text-sm font-medium">O</label><input type="number" value="1" step="any" class="mpif-o mt-1 block w-full rounded-md"></div><div><label class="block text-sm font-medium">S</label><input type="number" value="1" step="any" class="mpif-s mt-1 block w-full rounded-md"></div><div><label class="block text-sm font-medium">U</label><input type="number" value="1" step="any" class="mpif-u mt-1 block w-full rounded-md"></div><div class="bg-gray-50 p-2 rounded-md"><label class="block text-sm font-medium">mPIF (m⁻¹)</label><input type="text" class="mpif-result mt-1 block w-full bg-gray-200" readonly></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>External Dose Estimate</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-sm font-medium text-gray-700">Dose Rate (mrem/hr)</label><input type="number" min="0" step="0.01" value="0" class="dose-rate mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div><label class="block text-sm font-medium text-gray-700">Person-Hours</label><input type="text" class="dose-person-hours mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-200" readonly></div><div><label class="block text-sm font-medium text-gray-700">Collective External Dose (mrem)</label><input type="text" class="external-dose-result mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50" readonly></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Protection Factors (For this task)</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Respiratory (PFR)</h3><div class="space-y-4"><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" checked class="resp-protection h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">None (PFR=1)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="50"><label class="ml-3 font-medium text-gray-700">APR (PFR=50)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">PAPR (PFR=1000)</label></div></div></div><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Engineering (PFE)</h3><div class="space-y-4"><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" checked class="eng-control h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">No Controls (PFE=1)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">Type I (PFE=1,000)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="100000"><label class="ml-3 font-medium text-gray-700">Type II (PFE=100,000)</label></div></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Internal Dose Calculation</h2><span class="text-sm">Click to expand/collapse</span></div><div class="toggle-content"><div><div class="p-6"><div class="nuclides-container space-y-4"></div><button class="add-nuclide-btn mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"><i class="fas fa-plus mr-2"></i>Add Nuclide</button><div class="mt-6 border-t pt-4"><h4 class="text-md font-semibold text-gray-800 mb-2">Internal Dose Breakdown</h4><div class="calculation-breakdown p-4 bg-gray-50 rounded-lg grid grid-cols-2 md:grid-cols-4 gap-4 text-sm"></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 p-4 border-t-4 border-green-500"><h3 class="text-lg font-semibold text-gray-800 mb-2">Task Totals</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="bg-gray-100 p-3 rounded-md"><label class="block text-sm font-medium text-gray-700">Collective Effective Dose (mrem)</label><input type="text" class="task-total-effective-dose mt-1 block w-full rounded-md bg-gray-200" readonly></div><div class="bg-green-100 p-3 rounded-md"><label class="block text-sm font-bold text-green-800">Individual Effective Dose (mrem)</label><input type="text" class="task-individual-effective-dose mt-1 block w-full rounded-md bg-green-200 font-bold" readonly></div></div></div>
+        </div>
+    </template>
+    
+    <template id="nuclide-row-template">
+        <div class="nuclide-row grid grid-cols-1 md:grid-cols-5 gap-4 border p-3 rounded-lg bg-white items-end">
+            <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Nuclide</label><select class="nuclide-select mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select></div>
+            <div><label class="block text-sm font-medium text-gray-700">Contam. (dpm/100cm²)</label><input type="number" value="0" step="any" class="nuclide-contam-level mt-1 block w-full rounded-md"></div>
+            <div><label class="block text-sm font-medium text-gray-700">DAC (µCi/cm³)</label><input type="text" value="0" class="nuclide-dac mt-1 block w-full bg-gray-200" readonly></div>
+            <button class="remove-nuclide-btn text-red-500 hover:text-red-700 no-print h-10"><i class="fas fa-trash-alt"></i></button>
+        </div>
+    </template>
+
+    <script>
+        const DAC_VALUES = { // 10 CFR 835 Appendix A, Stochastic DAC (µCi/ml), converted to µCi/cm³ (1 ml = 1 cm³)
+            "Ac-227": 3e-13, "Am-241": 5e-12, "Am-243": 5e-12, "Sb-125": 2e-7, "As-76": 2e-7, "Ba-133": 2e-7, "Ba-140": 4e-8, "Be-7": 2e-7, "Bi-207": 4e-8, "Bi-210": 2e-9, "Bk-249": 2e-9, "C-11": 4e-6, "C-14": 2e-7, "Cd-109": 8e-8, "Ce-139": 2e-7, "Ce-141": 1e-7, "Ce-144": 2e-9, "Cf-252": 2e-11, "Cl-36": 2e-8, "Cm-242": 2e-11, "Cm-244": 8e-12, "Cm-246": 5e-12, "Co-57": 4e-7, "Co-58": 2e-7, "Co-60": 3e-9, "Cr-51": 3e-6, "Cs-134": 2e-8, "Cs-137": 6e-8, "Eu-152": 6e-9, "Eu-154": 5e-9, "Eu-155": 5e-7, "Fe-55": 2e-6, "Fe-59": 3e-8, "Ga-67": 1e-6, "Gd-153": 6e-7, "Ge-68": 2e-7, "H-3": 2e-5, "Hf-181": 7e-8, "Hg-203": 2e-7, "I-125": 4e-9, "I-129": 6e-9, "I-131": 2e-8, "In-111": 5e-7, "Ir-192": 2e-8, "K-40": 3e-8, "Kr-85": 1e-4, "La-140": 2e-7, "Lu-177": 6e-7, "Mn-54": 3e-7, "Mo-99": 2e-7, "Na-22": 2e-8, "Na-24": 3e-7, "Nb-94": 2e-9, "Nb-95": 2e-7, "Ni-59": 2e-6, "Ni-63": 2e-7, "Np-237": 5e-12, "P-32": 9e-9, "Pa-231": 2e-12, "Pb-210": 1e-10, "Pd-103": 3e-6, "Pm-147": 3e-7, "Po-210": 4e-11, "Pu-238": 7e-12, "Pu-239": 6e-12, "Pu-240": 6e-12, "Pu-241": 3e-10, "Ra-226": 3e-11, "Rb-86": 2e-8, "Re-186": 1e-6, "Rh-106": 2e-9, "Ru-103": 3e-7, "Ru-106": 3e-9, "S-35": 2e-7, "Sc-46": 1e-7, "Se-75": 2e-7, "Sm-151": 3e-6, "Sn-113": 2e-7, "Sr-85": 3e-7, "Sr-89": 3e-8, "Sr-90": 7e-9, "Ta-182": 4e-8, "Tc-99": 2e-6, "Tc-99m": 2e-5, "Te-123m": 2e-7, "Th-228": 2e-12, "Th-230": 7e-13, "Th-232": 3e-13, "Th-234": 3e-9, "Tl-204": 2e-7, "Tm-170": 2e-7, "U-233": 9e-11, "U-234": 1e-10, "U-235": 1e-10, "U-238": 1e-10, "V-48": 2e-7, "W-185": 8e-7, "Xe-133": 3e-5, "Y-88": 1e-7, "Y-90": 2e-8, "Y-91": 2e-8, "Yb-169": 2e-7, "Zn-65": 1e-7, "Zr-95": 1e-7, "Other": 0
+        };
+        let taskCounter = 0;
+        const mainContentArea = document.getElementById('tab-content-area');
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('addNewTaskBtn').addEventListener('click', addNewTask);
+            document.getElementById('printBtn').addEventListener('click', () => window.print());
+            mainContentArea.addEventListener('input', handleTaskInput);
+            mainContentArea.addEventListener('click', handleTaskClick);
+            addSummaryTab();
+            switchTab(document.querySelector('.tab-button[data-target="summary-content"]'));
+            updateChecklistAlerts();
+        });
+
+        function addSummaryTab() {
+            const nav = document.getElementById('tab-nav');
+            const summaryButton = document.createElement('button');
+            summaryButton.className = 'tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
+            summaryButton.textContent = 'Summary';
+            summaryButton.dataset.target = 'summary-content';
+            summaryButton.onclick = () => switchTab(summaryButton);
+            nav.appendChild(summaryButton);
+            document.getElementById('summary-content').innerHTML = document.getElementById('summary-template').innerHTML;
+        }
+
+        function addNewTask() {
+            taskCounter++;
+            const template = document.getElementById('task-template').content.cloneNode(true);
+            const taskContainer = template.querySelector('.task-container');
+            taskContainer.dataset.taskId = taskCounter;
+            taskContainer.id = `task-content-${taskCounter}`;
+            taskContainer.querySelectorAll('[name*="{taskId}"]').forEach(el => el.name = el.name.replace('{taskId}', taskCounter));
+            mainContentArea.appendChild(template);
+            document.getElementById('empty-state').style.display = 'none';
+            const nav = document.getElementById('tab-nav');
+            const taskButton = document.createElement('button');
+            taskButton.className = 'tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
+            taskButton.textContent = `Task ${taskCounter}`;
+            taskButton.dataset.target = `task-content-${taskCounter}`;
+            taskButton.onclick = () => switchTab(taskButton);
+            nav.appendChild(taskButton);
+            addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'));
+            switchTab(taskButton);
+            calculateTaskTotals(taskContainer);
+        }
+
+        function addNuclideRow(button) {
+            const nuclidesContainer = button.previousElementSibling;
+            const template = document.getElementById('nuclide-row-template').content.cloneNode(true);
+            const select = template.querySelector('.nuclide-select');
+            Object.keys(DAC_VALUES).forEach(nuclide => {
+                const option = document.createElement('option');
+                option.value = nuclide; option.textContent = nuclide;
+                select.appendChild(option);
+            });
+            select.addEventListener('change', (e) => {
+                const dacInput = e.target.closest('.nuclide-row').querySelector('.nuclide-dac');
+                dacInput.value = DAC_VALUES[e.target.value].toExponential(2);
+                dacInput.readOnly = e.target.value !== 'Other';
+                calculateTaskTotals(e.target.closest('.task-container'));
+            });
+            select.dispatchEvent(new Event('change'));
+            nuclidesContainer.appendChild(template);
+            calculateTaskTotals(button.closest('.task-container'));
+        }
+
+        function removeTask(button) {
+            const taskContainer = button.closest('.task-container');
+            const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
+            switchTab(document.querySelector('.tab-button[data-target="summary-content"]'));
+            taskContainer.remove();
+            tabButton.remove();
+            renumberTasks();
+            if (document.querySelectorAll('.task-container').length === 0) document.getElementById('empty-state').style.display = 'block';
+            updateSummary();
+        }
+
+        function renumberTasks() {
+            document.querySelectorAll('.task-container').forEach((task, index) => {
+                const newId = index + 1;
+                const oldId = task.dataset.taskId;
+                if (String(oldId) === String(newId)) return;
+                task.dataset.taskId = newId;
+                task.id = `task-content-${newId}`;
+                const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`);
+                if(tabButton) {
+                    tabButton.textContent = `Task ${newId}`;
+                    tabButton.dataset.target = `task-content-${newId}`;
+                }
+                task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => el.name = el.name.replace('-'+oldId, '-'+newId));
+            });
+            taskCounter = document.querySelectorAll('.task-container').length;
+        }
+
+        function switchTab(button) {
+            if (!button) return;
+            document.querySelectorAll('.tab-content-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+            document.getElementById(button.dataset.target)?.classList.add('active');
+            button.classList.add('active');
+        }
+
+        function handleTaskInput(event) {
+            const taskContainer = event.target.closest('.task-container');
+            if (taskContainer) {
+                calculateTaskTotals(taskContainer);
+                if (event.target.matches('.task-title')) {
+                    const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
+                    if (tabButton) {
+                        tabButton.textContent = event.target.value || `Task ${taskContainer.dataset.taskId}`;
+                    }
+                }
+            }
+        }
+
+        function handleTaskClick(event) {
+            const button = event.target.closest('button');
+            if (!button) return;
+            if (button.matches('.remove-task-btn')) removeTask(button);
+            if (button.matches('.add-nuclide-btn')) addNuclideRow(button);
+            if (button.matches('.remove-nuclide-btn')) {
+                const taskContainer = button.closest('.task-container');
+                button.closest('.nuclide-row').remove();
+                calculateTaskTotals(taskContainer);
+            }
+        }
+        
+        function toggleSection(header) {
+            header.classList.toggle('expanded');
+            header.nextElementSibling.classList.toggle('expanded');
+        }
+
+        function calculateTaskTotals(task) {
+            const getVal = (selector) => parseFloat(task.querySelector(selector)?.value) || 0;
+            const getRadio = (name) => parseFloat(task.querySelector(`input[name^="${name}"]:checked`)?.value) || 1;
+            const setVal = (selector, val, format) => {
+                const el = task.querySelector(selector);
+                if (el) el.value = format === 'exp' ? val.toExponential(2) : val.toFixed(2);
+            };
+            const setHTML = (selector, html) => {
+                const el = task.querySelector(selector);
+                if(el) el.innerHTML = html;
+            }
+
+            const workers = getVal('.workers-count');
+            const hours = getVal('.hours-per-worker');
+            const personHours = workers * hours;
+            setVal('.person-hours', personHours, 'fixed');
+            setVal('.dose-person-hours', personHours, 'fixed');
+
+            const mPIF = 1e-6 * getVal('.mpif-c') * getVal('.mpif-r') * getVal('.mpif-d') * getVal('.mpif-o') * getVal('.mpif-s') * getVal('.mpif-u');
+            setVal('.mpif-result', mPIF, 'exp');
+            
+            const rate = getVal('.dose-rate');
+            const collectiveExternalDose = rate * personHours;
+            setVal('.external-dose-result', collectiveExternalDose, 'fixed');
+
+            const pfr = getRadio('resp-protection');
+            const pfe = getRadio('eng-control');
+            let totalDacFraction = 0;
+
+            task.querySelectorAll('.nuclide-row').forEach(row => {
+                const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
+                const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
+                const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
+                totalDacFraction += (airConc / dac);
+            });
+
+            const collectiveInternalDose = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
+            
+            const breakdownHTML = `
+                <div><span class="font-medium text-gray-600">Σ DAC Fraction:</span><p class="font-semibold">${totalDacFraction.toExponential(2)}</p></div>
+                <div><span class="font-medium text-gray-600">PFR:</span><p class="font-semibold">${pfr}</p></div>
+                <div><span class="font-medium text-gray-600">PFE:</span><p class="font-semibold">${pfe}</p></div>
+                <div class="md:col-span-2 bg-blue-100 p-2 rounded-md"><span class="font-medium text-blue-800">Collective Internal Dose (mrem):</span><p class="font-bold text-blue-800">${collectiveInternalDose.toExponential(2)}</p></div>
+            `;
+            setHTML('.calculation-breakdown', breakdownHTML);
+            
+            const collectiveEffectiveDose = collectiveExternalDose + collectiveInternalDose;
+            setVal('.task-total-effective-dose', collectiveEffectiveDose, 'fixed');
+
+            const individualEffectiveDose = workers > 0 ? collectiveEffectiveDose / workers : 0;
+            setVal('.task-individual-effective-dose', individualEffectiveDose, 'fixed');
+            
+            updateSummary();
+        }
+
+        function updateSummary() {
+            const tasks = document.querySelectorAll('.task-container');
+            const summaryBody = document.getElementById('summary-table-body');
+            summaryBody.innerHTML = '';
+            let totalIndividualEffectiveDose = 0;
+
+            if (tasks.length === 0) {
+                summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="5" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
+            } else {
+                tasks.forEach((task, index) => {
+                    const taskTitle = task.querySelector('.task-title').value || `Task ${index + 1}`;
+                    const workers = parseFloat(task.querySelector('.workers-count').value) || 0;
+                    
+                    const collectiveExternal = parseFloat(task.querySelector('.external-dose-result').value) || 0;
+                    
+                    const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
+                    const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
+                    const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
+                    const mPIF = parseFloat(task.querySelector('.mpif-result').value) || 0;
+                    let totalDacFraction = 0;
+                    task.querySelectorAll('.nuclide-row').forEach(row => {
+                        const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
+                        const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
+                        const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
+                        totalDacFraction += (airConc / dac);
+                    });
+                    const collectiveInternal = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
+
+                    const individualExternal = workers > 0 ? collectiveExternal / workers : 0;
+                    const individualInternal = workers > 0 ? collectiveInternal / workers : 0;
+                    const individualTotal = individualExternal + individualInternal;
+                    
+                    totalIndividualEffectiveDose += individualTotal;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-4 py-2 text-sm font-medium text-gray-900">${taskTitle}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${workers}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${individualExternal.toFixed(2)}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${individualInternal.toExponential(2)}</td>
+                        <td class="px-4 py-2 text-sm font-semibold">${individualTotal.toFixed(2)}</td>`;
+                    summaryBody.appendChild(row);
+                });
+            }
+
+            document.getElementById('total-individual-dose-per-worker').value = totalIndividualEffectiveDose.toFixed(2);
+            const alaraCheck = document.getElementById('alara-2');
+            if (alaraCheck) alaraCheck.checked = totalIndividualEffectiveDose > 500;
+            updateChecklistAlerts();
+        }
+        
+        function updateChecklistAlerts() {
+            const airSamplingNeeded = Array.from(document.querySelectorAll('.air-sampling-check')).some(c => c.checked);
+            const airSamplingAlert = document.getElementById('airSamplingAlert');
+            if(airSamplingAlert) {
+                airSamplingAlert.style.display = airSamplingNeeded ? 'flex' : 'none';
+                document.getElementById('noAirSamplingAlert').style.display = airSamplingNeeded ? 'none' : 'flex';
+            }
+            const alaraReviewNeeded = Array.from(document.querySelectorAll('.alara-check')).some(c => c.checked);
+            const alaraAlert = document.getElementById('alaraAlert');
+            if(alaraAlert) {
+                alaraAlert.style.display = alaraReviewNeeded ? 'flex' : 'none';
+                document.getElementById('noAlaraAlert').style.display = alaraReviewNeeded ? 'none' : 'flex';
+            }
+        }
+    </script>
+</body>
+</html>
