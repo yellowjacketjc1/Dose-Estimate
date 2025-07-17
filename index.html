@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RPP-742 Task-Based Effective Dose Assessment Worksheet</title>
+    <title>RPP-742 Assessment Tool</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -11,6 +11,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
+        .module-content { display: none; }
+        .module-content.active { display: block; }
         .toggle-content {
             display: grid;
             grid-template-rows: 0fr;
@@ -48,7 +50,7 @@
             .no-print { display: none !important; }
             .printable-section, .tab-content-pane { display: block !important; page-break-before: always; }
             .toggle-content { display: block !important; grid-template-rows: 1fr !important; }
-            .toggle-label::after, .tab-nav { display: none !important; }
+            .toggle-label::after, .tab-nav, .module-nav { display: none !important; }
             .bg-blue-700 { background-color: #1d4ed8 !important; }
             .text-white { color: white !important; }
         }
@@ -60,8 +62,8 @@
         <header class="bg-blue-800 text-white rounded-lg shadow-lg mb-8 overflow-hidden">
             <div class="px-6 py-4 flex justify-between items-center">
                 <div>
-                    <h1 class="text-2xl md:text-3xl font-bold">RPP-742 Task-Based Dose Assessment</h1>
-                    <p class="text-blue-200 mt-1">Dose Estimation Tool</p>
+                    <h1 class="text-2xl md:text-3xl font-bold">RPP-742 Assessment Tool</h1>
+                    <p class="text-blue-200 mt-1">Dose & Containment Evaluation</p>
                 </div>
                 <div class="flex items-center space-x-2 no-print">
                     <input type="file" id="loadFile" class="hidden" accept=".json">
@@ -72,34 +74,105 @@
             </div>
         </header>
 
-        <!-- Project Information -->
-        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden printable-section">
-            <div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Project Information</h2></div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <input type="text" id="projectName" placeholder="Project Name*" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
-                    <input type="text" id="workOrder" placeholder="Work Order Number" class="project-info block w-full rounded-md border-gray-300 shadow-sm">
-                    <input type="text" id="location" placeholder="Location*" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
-                    <input type="date" id="date" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
+        <!-- Module Navigation -->
+        <nav class="flex justify-center space-x-4 mb-8 no-print module-nav">
+            <button id="dose-module-btn" class="px-6 py-3 text-lg font-semibold text-white bg-blue-600 rounded-md shadow-md hover:bg-blue-700 transition w-1/2">Dose Assessment</button>
+            <button id="containment-module-btn" class="px-6 py-3 text-lg font-semibold text-blue-700 bg-white rounded-md shadow-md hover:bg-gray-50 transition w-1/2">Containment Evaluation</button>
+        </nav>
+
+        <!-- Dose Assessment Module -->
+        <div id="dose-assessment-module" class="module-content active">
+            <!-- Project Information -->
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden printable-section">
+                <div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Project Information</h2></div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="projectName" placeholder="Project Name*" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <input type="text" id="workOrder" placeholder="Work Order Number" class="project-info block w-full rounded-md border-gray-300 shadow-sm">
+                        <input type="text" id="location" placeholder="Location*" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
+                        <input type="date" id="date" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
+                    </div>
+                    <textarea id="description" rows="3" placeholder="Work Description*" class="project-info mt-4 block w-full rounded-md border-gray-300 shadow-sm" required></textarea>
                 </div>
-                <textarea id="description" rows="3" placeholder="Work Description*" class="project-info mt-4 block w-full rounded-md border-gray-300 shadow-sm" required></textarea>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="mb-4 border-b border-gray-200 no-print">
+                <nav id="tab-nav" class="flex space-x-2 items-center" aria-label="Tabs">
+                    <button id="addNewTaskBtn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"><i class="fas fa-plus mr-2"></i>Add New Task</button>
+                </nav>
+            </div>
+
+            <!-- Tab Content Area -->
+            <div id="tab-content-area">
+                <div id="empty-state" class="text-center py-16 bg-white rounded-lg shadow-md"><i class="fas fa-tasks fa-3x text-gray-400 mb-4"></i><h2 class="text-xl font-semibold text-gray-700">No Tasks Added Yet</h2><p class="text-gray-500 mt-2">Click the "Add New Task" button to begin.</p></div>
+                <div id="summary-content" class="tab-content-pane printable-section">
+                    <!-- Summary Content will be populated by template -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Containment Evaluation Module -->
+        <div id="containment-evaluation-module" class="module-content">
+            <div class="bg-white rounded-lg shadow-md mb-8 p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-4">Containment Adequacy Calculation (2% DAC Method)</h2>
+                
+                <!-- Parameters -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Left Column -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="containment-type" class="block text-sm font-medium text-gray-700">Containment Type (sets $f_a$)</label>
+                            <select id="containment-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <option value="1">Bench Top (fa=1)</option>
+                                <option value="0.001">Fume Hood (fa=1e-3)</option>
+                                <option value="0.000001" selected>Glovebox (fa=1e-6)</option>
+                                <option value="0.00000001">Negative Pressure Glovebox (fa=1e-8)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="material-form" class="block text-sm font-medium text-gray-700">Material Form (sets $f_r$)</label>
+                            <select id="material-form" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <option value="1">Volatiles (fr=1)</option>
+                                <option value="0.1" selected>Powders (fr=0.1)</option>
+                                <option value="0.01">Liquids (fr=0.01)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="space-y-4">
+                        <div>
+                            <label for="room-volume" class="block text-sm font-medium text-gray-700">Room Volume (V) in cm³</label>
+                            <input type="number" id="room-volume" value="18000000" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label for="air-exchange" class="block text-sm font-medium text-gray-700">Effective Air Exchanges per Hour ($\lambda_v$)</label>
+                            <input type="number" id="air-exchange" value="0.6" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nuclide Inventory -->
+                <div class="mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-3">Radionuclide Inventory</h3>
+                    <div id="containment-nuclides-container" class="space-y-4">
+                        <!-- Nuclide rows will be added here -->
+                    </div>
+                    <button id="add-containment-nuclide-btn" class="mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"><i class="fas fa-plus mr-2"></i>Add Nuclide</button>
+                </div>
+
+                <!-- Results -->
+                <div class="border-t pt-6">
+                     <h3 class="text-lg font-semibold text-gray-800 mb-3">Evaluation Result</h3>
+                    <div id="containment-result-box" class="p-6 rounded-lg text-center transition-all duration-300">
+                        <p id="containment-status" class="text-3xl font-bold"></p>
+                        <p id="containment-sum-fraction" class="text-lg mt-1"></p>
+                        <p id="containment-bioassay" class="text-md mt-4 font-semibold"></p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="mb-4 border-b border-gray-200 no-print">
-            <nav id="tab-nav" class="flex space-x-2 items-center" aria-label="Tabs">
-                <button id="addNewTaskBtn" class="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700"><i class="fas fa-plus mr-2"></i>Add New Task</button>
-            </nav>
-        </div>
-
-        <!-- Tab Content Area -->
-        <div id="tab-content-area">
-            <div id="empty-state" class="text-center py-16 bg-white rounded-lg shadow-md"><i class="fas fa-tasks fa-3x text-gray-400 mb-4"></i><h2 class="text-xl font-semibold text-gray-700">No Tasks Added Yet</h2><p class="text-gray-500 mt-2">Click the "Add New Task" button to begin.</p></div>
-            <div id="summary-content" class="tab-content-pane printable-section">
-                <!-- Summary Content will be populated by template -->
-            </div>
-        </div>
     </div>
 
     <!-- Templates (Hidden) -->
@@ -131,7 +204,11 @@
     <template id="task-template">
         <div class="task-container tab-content-pane printable-section" data-task-id="{taskId}">
             <div class="bg-white rounded-lg shadow-md mb-4 p-4 border-l-4 border-blue-500"><div class="flex justify-between items-center"><div class="flex-grow"><input type="text" id="task-title-{taskId}" name="task-title" class="task-title mt-1 block w-full text-lg font-semibold rounded-md border-gray-300 shadow-sm" placeholder="Enter Task Name Here"></div><button class="remove-task-btn ml-4 text-red-500 hover:text-red-700 no-print"><i class="fas fa-trash-alt mr-1"></i>Remove Task</button></div></div>
-            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label expanded" onclick="toggleSection(this)"><h2>Time Estimation</h2></div><div class="toggle-content expanded"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-4 gap-4"><div><label class="block text-sm font-medium text-gray-700"># Workers</label><input type="number" min="1" value="" class="workers-count mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div><label class="block text-sm font-medium text-gray-700">Hours Each</label><input type="number" min="0" step="0.1" value="" class="hours-per-worker mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Person-Hours</label><input type="text" class="person-hours mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50" readonly></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label expanded" onclick="toggleSection(this)"><h2>Time Estimation</h2></div><div class="toggle-content expanded"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div><label class="block text-sm font-medium text-gray-700"># Workers</label><input type="number" min="1" value="" class="workers-count mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="1"></div>
+                <div><label class="block text-sm font-medium text-gray-700">Hours Each</label><input type="number" min="0" step="0.1" value="" class="hours-per-worker mt-1 block w-full rounded-md border-gray-300 shadow-sm" placeholder="1"></div>
+                <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Person-Hours</label><input type="text" class="person-hours mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50" readonly></div>
+            </div></div></div></div></div>
             <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>mPIF Calculation</h2></div><div class="toggle-content"><div><div class="p-6 space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                     <div><label class="block text-sm font-medium text-gray-700">Release Factor (R)</label><p class="text-xs text-gray-500">Fraction of material that is potentially releasable.</p><select class="mpif-r mt-1 block w-full rounded-md"></select></div>
@@ -158,14 +235,60 @@
         </div>
     </template>
 
-    <script>
-        const DAC_VALUES = { "Ac-227": 3e-13, "Am-241": 5e-12, "Am-243": 5e-12, "Sb-125": 2e-7, "As-76": 2e-7, "Ba-133": 2e-7, "Ba-140": 4e-8, "Be-7": 2e-7, "Bi-207": 4e-8, "Bi-210": 2e-9, "Bk-249": 2e-9, "C-11": 4e-6, "C-14": 2e-7, "Cd-109": 8e-8, "Ce-139": 2e-7, "Ce-141": 1e-7, "Ce-144": 2e-9, "Cf-252": 2e-11, "Cl-36": 2e-8, "Cm-242": 2e-11, "Cm-244": 8e-12, "Cm-246": 5e-12, "Co-57": 4e-7, "Co-58": 2e-7, "Co-60": 3e-9, "Cr-51": 3e-6, "Cs-134": 2e-8, "Cs-137": 6e-8, "Eu-152": 6e-9, "Eu-154": 5e-9, "Eu-155": 5e-7, "Fe-55": 2e-6, "Fe-59": 3e-8, "Ga-67": 1e-6, "Gd-153": 6e-7, "Ge-68": 2e-7, "H-3": 2e-5, "Hf-181": 7e-8, "Hg-203": 2e-7, "I-125": 4e-9, "I-129": 6e-9, "I-131": 2e-8, "In-111": 5e-7, "Ir-192": 2e-8, "K-40": 3e-8, "Kr-85": 1e-4, "La-140": 2e-7, "Lu-177": 6e-7, "Mn-54": 3e-7, "Mo-99": 2e-7, "Na-22": 2e-8, "Na-24": 3e-7, "Nb-94": 2e-9, "Nb-95": 2e-7, "Ni-59": 2e-6, "Ni-63": 2e-7, "Np-237": 5e-12, "P-32": 9e-9, "Pa-231": 2e-12, "Pb-210": 1e-10, "Pd-103": 3e-6, "Pm-147": 3e-7, "Po-210": 4e-11, "Pu-238": 7e-12, "Pu-239": 6e-12, "Pu-240": 6e-12, "Pu-241": 3e-10, "Ra-226": 3e-11, "Rb-86": 2e-8, "Re-186": 1e-6, "Rh-106": 2e-9, "Ru-103": 3e-7, "Ru-106": 3e-9, "S-35": 2e-7, "Sc-46": 1e-7, "Se-75": 2e-7, "Sm-151": 3e-6, "Sn-113": 2e-7, "Sr-85": 3e-7, "Sr-89": 3e-8, "Sr-90": 7e-9, "Ta-182": 4e-8, "Tc-99": 2e-6, "Tc-99m": 2e-5, "Te-123m": 2e-7, "Th-228": 2e-12, "Th-230": 7e-13, "Th-232": 3e-13, "Th-234": 3e-9, "Tl-204": 2e-7, "Tm-170": 2e-7, "U-233": 9e-11, "U-234": 1e-10, "U-235": 1e-10, "U-238": 1e-10, "V-48": 2e-7, "W-185": 8e-7, "Xe-133": 3e-5, "Y-88": 1e-7, "Y-90": 2e-8, "Y-91": 2e-8, "Yb-169": 2e-7, "Zn-65": 1e-7, "Zr-95": 1e-7, "Other": 0 };
-        const RELEASE_FACTORS = { "Gases, volatile liquids (1.0)": 1.0, "Nonvolatile powders, some liquids (0.1)": 0.1, "Liquids, large area contamination (0.01)": 0.01, "Solids, spotty contamination (0.001)": 0.001, "Encapsulated material (0)": 0 };
-        const CONFINEMENT_FACTORS = { "None - Open bench (100)": 100, "Bagged material (10)": 10, "Fume Hood (1.0)": 1.0, "Enhanced Fume Hood (0.1)": 0.1, "Glovebox, Hot Cell (0.01)": 0.01 };
-        let taskCounter = 0;
-        const mainContentArea = document.getElementById('tab-content-area');
+    <template id="containment-nuclide-row-template">
+        <div class="containment-nuclide-row grid grid-cols-1 md:grid-cols-4 gap-4 border p-3 rounded-lg bg-white items-end">
+            <div class="md:col-span-2"><label class="block text-sm font-medium text-gray-700">Nuclide</label><select class="containment-nuclide-select mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select></div>
+            <div><label class="block text-sm font-medium text-gray-700">Activity (q) in µCi</label><input type="number" value="0" step="any" class="containment-nuclide-activity mt-1 block w-full rounded-md"></div>
+            <button class="remove-containment-nuclide-btn text-red-500 hover:text-red-700 no-print h-10"><i class="fas fa-trash-alt"></i></button>
+        </div>
+    </template>
 
+    <script>
+        // --- Shared Constants ---
+        const DAC_VALUES = { "Ac-227": 3e-13, "Am-241": 5e-12, "Am-243": 5e-12, "Sb-125": 2e-7, "As-76": 2e-7, "Ba-133": 2e-7, "Ba-140": 4e-8, "Be-7": 2e-7, "Bi-207": 4e-8, "Bi-210": 2e-9, "Bk-249": 2e-9, "C-11": 4e-6, "C-14": 2e-7, "Cd-109": 8e-8, "Ce-139": 2e-7, "Ce-141": 1e-7, "Ce-144": 2e-9, "Cf-252": 2e-11, "Cl-36": 2e-8, "Cm-242": 2e-11, "Cm-244": 8e-12, "Cm-246": 5e-12, "Co-57": 4e-7, "Co-58": 2e-7, "Co-60": 3e-9, "Cr-51": 3e-6, "Cs-134": 2e-8, "Cs-137": 6e-8, "Eu-152": 6e-9, "Eu-154": 5e-9, "Eu-155": 5e-7, "Fe-55": 2e-6, "Fe-59": 3e-8, "Ga-67": 1e-6, "Gd-153": 6e-7, "Ge-68": 2e-7, "H-3": 2e-5, "Hf-181": 7e-8, "Hg-203": 2e-7, "I-125": 4e-9, "I-129": 6e-9, "I-131": 2e-8, "In-111": 5e-7, "Ir-192": 2e-8, "K-40": 3e-8, "Kr-85": 1e-4, "La-140": 2e-7, "Lu-177": 6e-7, "Mn-54": 3e-7, "Mo-99": 2e-7, "Na-22": 2e-8, "Na-24": 3e-7, "Nb-94": 2e-9, "Nb-95": 2e-7, "Ni-59": 2e-6, "Ni-63": 2e-7, "Np-237": 5e-12, "P-32": 9e-9, "Pa-231": 2e-12, "Pb-210": 1e-10, "Pd-103": 3e-6, "Pm-147": 3e-7, "Po-210": 4e-11, "Pu-238": 7e-12, "Pu-239": 6e-12, "Pu-240": 6e-12, "Pu-241": 3e-10, "Ra-226": 3e-11, "Rb-86": 2e-8, "Re-186": 1e-6, "Rh-106": 2e-9, "Ru-103": 3e-7, "Ru-106": 3e-9, "S-35": 2e-7, "Sc-46": 1e-7, "Se-75": 2e-7, "Sm-151": 3e-6, "Sn-113": 2e-7, "Sr-85": 3e-7, "Sr-89": 3e-8, "Sr-90": 7e-9, "Ta-182": 4e-8, "Tc-99": 2e-6, "Tc-99m": 2e-5, "Te-123m": 2e-7, "Th-228": 2e-12, "Th-230": 7e-13, "Th-232": 3e-13, "Th-234": 3e-9, "Tl-204": 2e-7, "Tm-170": 2e-7, "U-233": 9e-11, "U-234": 1e-10, "U-235": 1e-10, "U-238": 1e-10, "V-48": 2e-7, "W-185": 8e-7, "Xe-133": 3e-5, "Y-88": 1e-7, "Y-90": 2e-8, "Y-91": 2e-8, "Yb-169": 2e-7, "Zn-65": 1e-7, "Zr-95": 1e-7, "Other": 0 };
+        
+        // --- App Initialization ---
         document.addEventListener('DOMContentLoaded', () => {
+            // Module switching
+            const doseModuleBtn = document.getElementById('dose-module-btn');
+            const containmentModuleBtn = document.getElementById('containment-module-btn');
+            const doseModule = document.getElementById('dose-assessment-module');
+            const containmentModule = document.getElementById('containment-evaluation-module');
+
+            doseModuleBtn.addEventListener('click', () => switchModule('dose'));
+            containmentModuleBtn.addEventListener('click', () => switchModule('containment'));
+
+            function switchModule(moduleName) {
+                if (moduleName === 'dose') {
+                    doseModule.classList.add('active');
+                    containmentModule.classList.remove('active');
+                    doseModuleBtn.classList.add('bg-blue-600', 'text-white');
+                    doseModuleBtn.classList.remove('bg-white', 'text-blue-700');
+                    containmentModuleBtn.classList.add('bg-white', 'text-blue-700');
+                    containmentModuleBtn.classList.remove('bg-blue-600', 'text-white');
+                } else {
+                    doseModule.classList.remove('active');
+                    containmentModule.classList.add('active');
+                    containmentModuleBtn.classList.add('bg-blue-600', 'text-white');
+                    containmentModuleBtn.classList.remove('bg-white', 'text-blue-700');
+                    doseModuleBtn.classList.add('bg-white', 'text-blue-700');
+                    doseModuleBtn.classList.remove('bg-blue-600', 'text-white');
+                }
+            }
+
+            // Initialize both modules
+            initializeDoseAssessment();
+            initializeContainmentEvaluation();
+        });
+
+
+        // --- Dose Assessment Module Logic ---
+        function initializeDoseAssessment() {
+            const RELEASE_FACTORS = { "Gases, volatile liquids (1.0)": 1.0, "Nonvolatile powders, some liquids (0.1)": 0.1, "Liquids, large area contamination (0.01)": 0.01, "Solids, spotty contamination (0.001)": 0.001, "Encapsulated material (0)": 0 };
+            const CONFINEMENT_FACTORS = { "None - Open bench (100)": 100, "Bagged material (10)": 10, "Fume Hood (1.0)": 1.0, "Enhanced Fume Hood (0.1)": 0.1, "Glovebox, Hot Cell (0.01)": 0.01 };
+            let taskCounter = 0;
+            const mainContentArea = document.getElementById('tab-content-area');
+
             document.getElementById('addNewTaskBtn').addEventListener('click', () => addNewTask());
             document.getElementById('printBtn').addEventListener('click', () => window.print());
             document.getElementById('saveBtn').addEventListener('click', saveStateToFile);
@@ -176,395 +299,471 @@
             addSummaryTab();
             switchTab(document.querySelector('.tab-button[data-target="summary-content"]'));
             updateChecklistAlerts();
-        });
 
-        function addSummaryTab() {
-            const nav = document.getElementById('tab-nav');
-            const summaryButton = document.createElement('button');
-            summaryButton.className = 'tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
-            summaryButton.textContent = 'Summary';
-            summaryButton.dataset.target = 'summary-content';
-            summaryButton.onclick = () => switchTab(summaryButton);
-            nav.appendChild(summaryButton);
-            document.getElementById('summary-content').innerHTML = document.getElementById('summary-template').innerHTML;
-        }
-
-        function addNewTask(taskData = null) {
-            taskCounter++;
-            const template = document.getElementById('task-template').content.cloneNode(true);
-            const taskContainer = template.querySelector('.task-container');
-            taskContainer.dataset.taskId = taskCounter;
-            taskContainer.id = `task-content-${taskCounter}`;
-            taskContainer.querySelectorAll('[name*="{taskId}"]').forEach(el => el.name = el.name.replace('{taskId}', taskCounter));
-            
-            const rSelect = taskContainer.querySelector('.mpif-r');
-            for (const [text, value] of Object.entries(RELEASE_FACTORS)) { rSelect.add(new Option(text, value)); }
-            const cSelect = taskContainer.querySelector('.mpif-c');
-            for (const [text, value] of Object.entries(CONFINEMENT_FACTORS)) { cSelect.add(new Option(text, value)); }
-
-            const defaultTitle = `Task ${taskCounter}`;
-            const taskTitleInput = taskContainer.querySelector('.task-title');
-
-            mainContentArea.appendChild(template);
-            document.getElementById('empty-state').style.display = 'none';
-            const nav = document.getElementById('tab-nav');
-            const taskButton = document.createElement('button');
-            taskButton.className = 'tab-button task-tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
-            taskButton.dataset.target = `task-content-${taskCounter}`;
-            taskButton.onclick = () => switchTab(taskButton);
-            
-            if (taskData && taskData.title) {
-                taskTitleInput.value = taskData.title;
-                taskButton.textContent = taskData.title;
-            } else {
-                taskTitleInput.value = defaultTitle;
-                taskButton.textContent = defaultTitle;
-            }
-            
-            nav.appendChild(taskButton);
-
-            if (taskData) {
-                populateTaskData(taskContainer, taskData);
-            } else {
-                addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'));
+            function addSummaryTab() {
+                const nav = document.getElementById('tab-nav');
+                const summaryButton = document.createElement('button');
+                summaryButton.className = 'tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
+                summaryButton.textContent = 'Summary';
+                summaryButton.dataset.target = 'summary-content';
+                summaryButton.onclick = () => switchTab(summaryButton);
+                nav.appendChild(summaryButton);
+                document.getElementById('summary-content').innerHTML = document.getElementById('summary-template').innerHTML;
             }
 
-            switchTab(taskButton);
-            calculateTaskTotals(taskContainer);
-        }
-        
-        function populateTaskData(taskContainer, taskData) {
-            const setValue = (selector, value) => {
-                const el = taskContainer.querySelector(selector);
-                if (el) el.value = value;
-            };
-            const setRadio = (name, value) => {
-                const el = taskContainer.querySelector(`input[name^="${name}"][value="${value}"]`);
-                if (el) el.checked = true;
-            };
-            
-            // The title is set in addNewTask, so we don't set it here again.
-            setValue('.workers-count', taskData.workers);
-            setValue('.hours-per-worker', taskData.hours);
-            setValue('.mpif-r', taskData.mpifR);
-            setValue('.mpif-c', taskData.mpifC);
-            setValue('.mpif-d', taskData.mpifD);
-            setValue('.mpif-s', taskData.mpifS);
-            setValue('.mpif-u', taskData.mpifU);
-            setValue('.dose-rate', taskData.doseRate);
-            setRadio('resp-protection', taskData.pfr);
-            setRadio('eng-control', taskData.pfe);
-
-            taskData.nuclides.forEach(nuclideData => {
-                addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'), nuclideData);
-            });
-        }
-
-        function addNuclideRow(button, nuclideData = null) {
-            const nuclidesContainer = button.previousElementSibling;
-            const template = document.getElementById('nuclide-row-template').content.cloneNode(true);
-            const select = template.querySelector('.nuclide-select');
-            Object.keys(DAC_VALUES).forEach(nuclide => {
-                const option = document.createElement('option');
-                option.value = nuclide; option.textContent = nuclide;
-                select.appendChild(option);
-            });
-            select.addEventListener('change', (e) => {
-                const dacInput = e.target.closest('.nuclide-row').querySelector('.nuclide-dac');
-                dacInput.value = DAC_VALUES[e.target.value].toExponential(2);
-                dacInput.readOnly = e.target.value !== 'Other';
-                calculateTaskTotals(e.target.closest('.task-container'));
-            });
-            
-            if (nuclideData) {
-                select.value = nuclideData.name;
-                template.querySelector('.nuclide-contam-level').value = nuclideData.contam;
-            }
-
-            select.dispatchEvent(new Event('change'));
-            nuclidesContainer.appendChild(template);
-            calculateTaskTotals(button.closest('.task-container'));
-        }
-
-        function removeTask(button) {
-            const taskContainer = button.closest('.task-container');
-            const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
-            switchTab(document.querySelector('.tab-button[data-target="summary-content"]'));
-            taskContainer.remove();
-            tabButton.remove();
-            renumberTasks();
-            if (document.querySelectorAll('.task-container').length === 0) document.getElementById('empty-state').style.display = 'block';
-            updateSummary();
-        }
-
-        function renumberTasks() {
-            const tasks = document.querySelectorAll('.task-container');
-            taskCounter = tasks.length;
-            tasks.forEach((task, index) => {
-                const newId = index + 1;
-                const oldId = task.dataset.taskId;
+            function addNewTask(taskData = null) {
+                taskCounter++;
+                const template = document.getElementById('task-template').content.cloneNode(true);
+                const taskContainer = template.querySelector('.task-container');
+                taskContainer.dataset.taskId = taskCounter;
+                taskContainer.id = `task-content-${taskCounter}`;
+                taskContainer.querySelectorAll('[name*="{taskId}"]').forEach(el => el.name = el.name.replace('{taskId}', taskCounter));
                 
-                task.dataset.taskId = newId;
-                task.id = `task-content-${newId}`;
+                const rSelect = taskContainer.querySelector('.mpif-r');
+                for (const [text, value] of Object.entries(RELEASE_FACTORS)) { rSelect.add(new Option(text, value)); }
+                const cSelect = taskContainer.querySelector('.mpif-c');
+                for (const [text, value] of Object.entries(CONFINEMENT_FACTORS)) { cSelect.add(new Option(text, value)); }
+
+                const defaultTitle = `Task ${taskCounter}`;
+                const taskTitleInput = taskContainer.querySelector('.task-title');
+
+                mainContentArea.appendChild(template);
+                document.getElementById('empty-state').style.display = 'none';
+                const nav = document.getElementById('tab-nav');
+                const taskButton = document.createElement('button');
+                taskButton.className = 'tab-button task-tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
+                taskButton.dataset.target = `task-content-${taskCounter}`;
+                taskButton.onclick = () => switchTab(taskButton);
                 
-                const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`) || document.querySelector(`.tab-button[data-target="task-content-${newId}"]`);
-                if(tabButton) {
-                    tabButton.dataset.target = `task-content-${newId}`;
-                    const titleInput = task.querySelector('.task-title');
-                    if (titleInput.value.startsWith("Task ")) {
-                        const newTitle = `Task ${newId}`;
-                        titleInput.value = newTitle;
-                        tabButton.textContent = newTitle;
-                    }
+                if (taskData && taskData.title) {
+                    taskTitleInput.value = taskData.title;
+                    taskButton.textContent = taskData.title;
+                } else {
+                    taskTitleInput.value = defaultTitle;
+                    taskButton.textContent = defaultTitle;
                 }
-                task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => el.name = el.name.replace('-'+oldId, '-'+newId));
-            });
-        }
+                
+                nav.appendChild(taskButton);
 
-        function switchTab(button) {
-            if (!button) return;
-            document.querySelectorAll('.tab-content-pane').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
-            document.getElementById(button.dataset.target)?.classList.add('active');
-            button.classList.add('active');
-        }
-
-        function handleTaskInput(event) {
-            const taskContainer = event.target.closest('.task-container');
-            if (taskContainer) {
-                // Clamp mPIF inputs
-                if(event.target.matches('.mpif-d, .mpif-s, .mpif-u')) {
-                    const val = parseFloat(event.target.value);
-                    if (val > 10) event.target.value = 10;
-                    if (val < 1) event.target.value = 1;
+                if (taskData) {
+                    populateTaskData(taskContainer, taskData);
+                } else {
+                    addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'));
                 }
 
+                switchTab(taskButton);
                 calculateTaskTotals(taskContainer);
-                if (event.target.matches('.task-title')) {
-                    const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
-                    if (tabButton) {
-                        tabButton.textContent = event.target.value || `Task ${taskContainer.dataset.taskId}`;
-                    }
-                }
             }
-        }
+            
+            function populateTaskData(taskContainer, taskData) {
+                const setValue = (selector, value) => {
+                    const el = taskContainer.querySelector(selector);
+                    if (el) el.value = value;
+                };
+                const setRadio = (name, value) => {
+                    const el = taskContainer.querySelector(`input[name^="${name}"][value="${value}"]`);
+                    if (el) el.checked = true;
+                };
+                
+                setValue('.workers-count', taskData.workers);
+                setValue('.hours-per-worker', taskData.hours);
+                setValue('.mpif-r', taskData.mpifR);
+                setValue('.mpif-c', taskData.mpifC);
+                setValue('.mpif-d', taskData.mpifD);
+                setValue('.mpif-s', taskData.mpifS);
+                setValue('.mpif-u', taskData.mpifU);
+                setValue('.dose-rate', taskData.doseRate);
+                setRadio('resp-protection', taskData.pfr);
+                setRadio('eng-control', taskData.pfe);
 
-        function handleTaskClick(event) {
-            const button = event.target.closest('button');
-            if (!button) return;
-            if (button.matches('.remove-task-btn')) removeTask(button);
-            if (button.matches('.add-nuclide-btn')) addNuclideRow(button);
-            if (button.matches('.remove-nuclide-btn')) {
+                taskData.nuclides.forEach(nuclideData => {
+                    addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'), nuclideData);
+                });
+            }
+
+            function addNuclideRow(button, nuclideData = null) {
+                const nuclidesContainer = button.previousElementSibling;
+                const template = document.getElementById('nuclide-row-template').content.cloneNode(true);
+                const select = template.querySelector('.nuclide-select');
+                Object.keys(DAC_VALUES).forEach(nuclide => {
+                    const option = document.createElement('option');
+                    option.value = nuclide; option.textContent = nuclide;
+                    select.appendChild(option);
+                });
+                select.addEventListener('change', (e) => {
+                    const dacInput = e.target.closest('.nuclide-row').querySelector('.nuclide-dac');
+                    dacInput.value = DAC_VALUES[e.target.value] ? DAC_VALUES[e.target.value].toExponential(2) : 0;
+                    dacInput.readOnly = e.target.value !== 'Other';
+                    calculateTaskTotals(e.target.closest('.task-container'));
+                });
+                
+                if (nuclideData) {
+                    select.value = nuclideData.name;
+                    template.querySelector('.nuclide-contam-level').value = nuclideData.contam;
+                }
+
+                select.dispatchEvent(new Event('change'));
+                nuclidesContainer.appendChild(template);
+                calculateTaskTotals(button.closest('.task-container'));
+            }
+
+            function removeTask(button) {
                 const taskContainer = button.closest('.task-container');
-                button.closest('.nuclide-row').remove();
-                calculateTaskTotals(taskContainer);
+                const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
+                switchTab(document.querySelector('.tab-button[data-target="summary-content"]'));
+                taskContainer.remove();
+                if(tabButton) tabButton.remove();
+                renumberTasks();
+                if (document.querySelectorAll('.task-container').length === 0) document.getElementById('empty-state').style.display = 'block';
+                updateSummary();
+            }
+
+            function renumberTasks() {
+                const tasks = document.querySelectorAll('.task-container');
+                taskCounter = tasks.length;
+                tasks.forEach((task, index) => {
+                    const newId = index + 1;
+                    const oldId = task.dataset.taskId;
+                    
+                    task.dataset.taskId = newId;
+                    task.id = `task-content-${newId}`;
+                    
+                    const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`) || document.querySelector(`.tab-button[data-target="task-content-${newId}"]`);
+                    if(tabButton) {
+                        tabButton.dataset.target = `task-content-${newId}`;
+                        const titleInput = task.querySelector('.task-title');
+                        if (titleInput.value.startsWith("Task ")) {
+                            const newTitle = `Task ${newId}`;
+                            titleInput.value = newTitle;
+                            tabButton.textContent = newTitle;
+                        } else {
+                            tabButton.textContent = titleInput.value;
+                        }
+                    }
+                    task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => el.name = el.name.replace('-'+oldId, '-'+newId));
+                });
+            }
+
+            function switchTab(button) {
+                if (!button) return;
+                document.querySelectorAll('.tab-content-pane').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.getElementById(button.dataset.target)?.classList.add('active');
+                button.classList.add('active');
+            }
+
+            function handleTaskInput(event) {
+                const taskContainer = event.target.closest('.task-container');
+                if (taskContainer) {
+                    if(event.target.matches('.mpif-d, .mpif-s, .mpif-u')) {
+                        const val = parseFloat(event.target.value);
+                        if (val > 10) event.target.value = 10;
+                        if (val < 1) event.target.value = 1;
+                    }
+
+                    calculateTaskTotals(taskContainer);
+                    if (event.target.matches('.task-title')) {
+                        const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
+                        if (tabButton) {
+                            tabButton.textContent = event.target.value || `Task ${taskContainer.dataset.taskId}`;
+                        }
+                    }
+                }
+            }
+
+            function handleTaskClick(event) {
+                const button = event.target.closest('button');
+                if (!button) return;
+                if (button.matches('.remove-task-btn')) removeTask(button);
+                if (button.matches('.add-nuclide-btn')) addNuclideRow(button);
+                if (button.matches('.remove-nuclide-btn')) {
+                    const taskContainer = button.closest('.task-container');
+                    button.closest('.nuclide-row').remove();
+                    calculateTaskTotals(taskContainer);
+                }
+            }
+            
+            function toggleSection(header) {
+                header.classList.toggle('expanded');
+                header.nextElementSibling.classList.toggle('expanded');
+            }
+
+            function calculateTaskTotals(task) {
+                if (!task) return;
+                const getVal = (selector) => parseFloat(task.querySelector(selector)?.value) || 0;
+                const getRadio = (name) => parseFloat(task.querySelector(`input[name^="${name}"]:checked`)?.value) || 1;
+                const setVal = (selector, val, format) => {
+                    const el = task.querySelector(selector);
+                    if (el) el.value = format === 'exp' ? val.toExponential(2) : val.toFixed(2);
+                };
+                const setHTML = (selector, html) => {
+                    const el = task.querySelector(selector);
+                    if(el) el.innerHTML = html;
+                }
+
+                const workers = getVal('.workers-count');
+                const hours = getVal('.hours-per-worker');
+                const personHours = workers * hours;
+                setVal('.person-hours', personHours, 'fixed');
+                setVal('.dose-person-hours', personHours, 'fixed');
+
+                const mPIF = 1e-6 * getVal('.mpif-r') * getVal('.mpif-c') * getVal('.mpif-d') * 1 * getVal('.mpif-s') * getVal('.mpif-u');
+                setVal('.mpif-result', mPIF, 'exp');
+                
+                const rate = getVal('.dose-rate');
+                const collectiveExternalDose = rate * personHours;
+                setVal('.external-dose-result', collectiveExternalDose, 'fixed');
+
+                const pfr = getRadio('resp-protection');
+                const pfe = getRadio('eng-control');
+                let totalDacFraction = 0;
+
+                task.querySelectorAll('.nuclide-row').forEach(row => {
+                    const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
+                    const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
+                    const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
+                    totalDacFraction += (airConc / dac);
+                });
+
+                const collectiveInternalDose = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
+                
+                const breakdownHTML = `
+                    <div><span class="font-medium text-gray-600">Σ DAC Fraction:</span><p class="font-semibold">${totalDacFraction.toExponential(2)}</p></div>
+                    <div><span class="font-medium text-gray-600">PFR:</span><p class="font-semibold">${pfr}</p></div>
+                    <div><span class="font-medium text-gray-600">PFE:</span><p class="font-semibold">${pfe}</p></div>
+                    <div class="md:col-span-2 bg-blue-100 p-2 rounded-md"><span class="font-medium text-blue-800">Collective Internal Dose (mrem):</span><p class="font-bold text-blue-800">${collectiveInternalDose.toExponential(2)}</p></div>
+                `;
+                setHTML('.calculation-breakdown', breakdownHTML);
+                
+                const collectiveEffectiveDose = collectiveExternalDose + collectiveInternalDose;
+                setVal('.task-total-effective-dose', collectiveEffectiveDose, 'fixed');
+
+                const individualEffectiveDose = workers > 0 ? collectiveEffectiveDose / workers : 0;
+                setVal('.task-individual-effective-dose', individualEffectiveDose, 'fixed');
+                
+                updateSummary();
+            }
+
+            function updateSummary() {
+                const tasks = document.querySelectorAll('.task-container');
+                const summaryBody = document.getElementById('summary-table-body');
+                summaryBody.innerHTML = '';
+                let totalIndividualEffectiveDose = 0;
+
+                if (tasks.length === 0) {
+                    summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="5" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
+                } else {
+                    tasks.forEach((task, index) => {
+                        const taskTitle = task.querySelector('.task-title').value || `Task ${task.dataset.taskId}`;
+                        const workers = parseFloat(task.querySelector('.workers-count').value) || 0;
+                        
+                        const collectiveExternal = parseFloat(task.querySelector('.external-dose-result').value) || 0;
+                        
+                        const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
+                        const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
+                        const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
+                        const mPIF = parseFloat(task.querySelector('.mpif-result').value) || 0;
+                        let totalDacFraction = 0;
+                        task.querySelectorAll('.nuclide-row').forEach(row => {
+                            const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
+                            const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
+                            const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
+                            totalDacFraction += (airConc / dac);
+                        });
+                        const collectiveInternal = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
+
+                        const individualExternal = workers > 0 ? collectiveExternal / workers : 0;
+                        const individualInternal = workers > 0 ? collectiveInternal / workers : 0;
+                        const individualTotal = individualExternal + individualInternal;
+                        
+                        totalIndividualEffectiveDose += individualTotal;
+
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="px-4 py-2 text-sm font-medium text-gray-900">${taskTitle}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">${workers}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">${individualExternal.toFixed(2)}</td>
+                            <td class="px-4 py-2 text-sm text-gray-500">${individualInternal.toExponential(2)}</td>
+                            <td class="px-4 py-2 text-sm font-semibold">${individualTotal.toFixed(2)}</td>`;
+                        summaryBody.appendChild(row);
+                    });
+                }
+
+                document.getElementById('total-individual-dose-per-worker').value = totalIndividualEffectiveDose.toFixed(2);
+                const alaraCheck = document.getElementById('alara-2');
+                if (alaraCheck) alaraCheck.checked = totalIndividualEffectiveDose > 500;
+                updateChecklistAlerts();
+            }
+            
+            function updateChecklistAlerts() {
+                const airSamplingNeeded = Array.from(document.querySelectorAll('.air-sampling-check')).some(c => c.checked);
+                const airSamplingAlert = document.getElementById('airSamplingAlert');
+                if(airSamplingAlert) {
+                    airSamplingAlert.style.display = airSamplingNeeded ? 'flex' : 'none';
+                    document.getElementById('noAirSamplingAlert').style.display = airSamplingNeeded ? 'none' : 'flex';
+                }
+                const alaraReviewNeeded = Array.from(document.querySelectorAll('.alara-check')).some(c => c.checked);
+                const alaraAlert = document.getElementById('alaraAlert');
+                if(alaraAlert) {
+                    alaraAlert.style.display = alaraReviewNeeded ? 'flex' : 'none';
+                    document.getElementById('noAlaraAlert').style.display = alaraReviewNeeded ? 'none' : 'flex';
+                }
+            }
+
+            function saveStateToFile() {
+                const state = {
+                    projectInfo: {},
+                    tasks: []
+                };
+
+                document.querySelectorAll('.project-info').forEach(el => {
+                    state.projectInfo[el.id] = el.value;
+                });
+
+                document.querySelectorAll('.task-container').forEach(task => {
+                    const taskData = {
+                        title: task.querySelector('.task-title').value,
+                        workers: task.querySelector('.workers-count').value,
+                        hours: task.querySelector('.hours-per-worker').value,
+                        mpifR: task.querySelector('.mpif-r').value,
+                        mpifC: task.querySelector('.mpif-c').value,
+                        mpifD: task.querySelector('.mpif-d').value,
+                        mpifS: task.querySelector('.mpif-s').value,
+                        mpifU: task.querySelector('.mpif-u').value,
+                        doseRate: task.querySelector('.dose-rate').value,
+                        pfr: task.querySelector('input[name^="resp-protection"]:checked').value,
+                        pfe: task.querySelector('input[name^="eng-control"]:checked').value,
+                        nuclides: []
+                    };
+                    task.querySelectorAll('.nuclide-row').forEach(row => {
+                        taskData.nuclides.push({
+                            name: row.querySelector('.nuclide-select').value,
+                            contam: row.querySelector('.nuclide-contam-level').value
+                        });
+                    });
+                    state.tasks.push(taskData);
+                });
+
+                const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'dose-estimate.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+
+            function loadStateFromFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const state = JSON.parse(e.target.result);
+                    
+                    document.querySelectorAll('.task-container').forEach(t => t.remove());
+                    document.querySelectorAll('.tab-button:not([data-target="summary-content"])').forEach(b => b.remove());
+                    taskCounter = 0;
+                    
+                    for (const [id, value] of Object.entries(state.projectInfo)) {
+                        const el = document.getElementById(id);
+                        if (el) el.value = value;
+                    }
+
+                    state.tasks.forEach(taskData => {
+                        addNewTask(taskData);
+                    });
+
+                    if(state.tasks.length === 0) {
+                         document.getElementById('empty-state').style.display = 'block';
+                    }
+
+                    updateSummary();
+                };
+                reader.readAsText(file);
             }
         }
-        
+
+        // --- Containment Evaluation Module Logic ---
+        function initializeContainmentEvaluation() {
+            const containmentModule = document.getElementById('containment-evaluation-module');
+            
+            document.getElementById('add-containment-nuclide-btn').addEventListener('click', addContainmentNuclideRow);
+            containmentModule.addEventListener('input', calculateContainment);
+            containmentModule.addEventListener('click', (event) => {
+                if(event.target.closest('.remove-containment-nuclide-btn')) {
+                    event.target.closest('.containment-nuclide-row').remove();
+                    calculateContainment();
+                }
+            });
+
+            function addContainmentNuclideRow() {
+                const container = document.getElementById('containment-nuclides-container');
+                const template = document.getElementById('containment-nuclide-row-template').content.cloneNode(true);
+                const select = template.querySelector('.containment-nuclide-select');
+                Object.keys(DAC_VALUES).forEach(nuclide => {
+                    const option = document.createElement('option');
+                    option.value = nuclide;
+                    option.textContent = nuclide;
+                    select.appendChild(option);
+                });
+                container.appendChild(template);
+                calculateContainment();
+            }
+
+            function calculateContainment() {
+                const fa = parseFloat(document.getElementById('containment-type').value) || 1;
+                const fr = parseFloat(document.getElementById('material-form').value) || 0.1;
+                const V = parseFloat(document.getElementById('room-volume').value) || 1.8e7;
+                const lambda_v = parseFloat(document.getElementById('air-exchange').value) || 0.6;
+                
+                let sumOfFractions = 0;
+                
+                document.querySelectorAll('.containment-nuclide-row').forEach(row => {
+                    const nuclideName = row.querySelector('.containment-nuclide-select').value;
+                    const activity_q = parseFloat(row.querySelector('.containment-nuclide-activity').value) || 0;
+                    const dac = DAC_VALUES[nuclideName] || 0;
+
+                    if (dac > 0 && activity_q > 0) {
+                        const max_q = (40 * dac * V * lambda_v) / (fa * fr);
+                        sumOfFractions += (activity_q / max_q);
+                    }
+                });
+
+                updateContainmentResult(sumOfFractions);
+            }
+
+            function updateContainmentResult(sumOfFractions) {
+                const resultBox = document.getElementById('containment-result-box');
+                const statusEl = document.getElementById('containment-status');
+                const sumFractionEl = document.getElementById('containment-sum-fraction');
+                const bioassayEl = document.getElementById('containment-bioassay');
+
+                sumFractionEl.textContent = `Sum of Fractions = ${sumOfFractions.toExponential(3)}`;
+
+                if (sumOfFractions <= 1) {
+                    statusEl.textContent = 'VALID';
+                    bioassayEl.textContent = 'Bioassay Program Entry Not Required.';
+                    resultBox.classList.remove('bg-red-100', 'text-red-800');
+                    resultBox.classList.add('bg-green-100', 'text-green-800');
+                } else {
+                    statusEl.textContent = 'NOT OK';
+                    bioassayEl.textContent = 'Bioassay Program Entry IS Required.';
+                    resultBox.classList.remove('bg-green-100', 'text-green-800');
+                    resultBox.classList.add('bg-red-100', 'text-red-800');
+                }
+            }
+            
+            // Add an initial row to start with
+            addContainmentNuclideRow();
+        }
+
+        // This function needs to be global for the inline onclick attribute
         function toggleSection(header) {
             header.classList.toggle('expanded');
             header.nextElementSibling.classList.toggle('expanded');
-        }
-
-        function calculateTaskTotals(task) {
-            if (!task) return;
-            const getVal = (selector) => parseFloat(task.querySelector(selector)?.value) || 0;
-            const getRadio = (name) => parseFloat(task.querySelector(`input[name^="${name}"]:checked`)?.value) || 1;
-            const setVal = (selector, val, format) => {
-                const el = task.querySelector(selector);
-                if (el) el.value = format === 'exp' ? val.toExponential(2) : val.toFixed(2);
-            };
-            const setHTML = (selector, html) => {
-                const el = task.querySelector(selector);
-                if(el) el.innerHTML = html;
-            }
-
-            const workers = getVal('.workers-count');
-            const hours = getVal('.hours-per-worker');
-            const personHours = workers * hours;
-            setVal('.person-hours', personHours, 'fixed');
-            setVal('.dose-person-hours', personHours, 'fixed');
-
-            const mPIF = 1e-6 * getVal('.mpif-r') * getVal('.mpif-c') * getVal('.mpif-d') * 1 * getVal('.mpif-s') * getVal('.mpif-u');
-            setVal('.mpif-result', mPIF, 'exp');
-            
-            const rate = getVal('.dose-rate');
-            const collectiveExternalDose = rate * personHours;
-            setVal('.external-dose-result', collectiveExternalDose, 'fixed');
-
-            const pfr = getRadio('resp-protection');
-            const pfe = getRadio('eng-control');
-            let totalDacFraction = 0;
-
-            task.querySelectorAll('.nuclide-row').forEach(row => {
-                const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
-                const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
-                const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
-                totalDacFraction += (airConc / dac);
-            });
-
-            const collectiveInternalDose = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
-            
-            const breakdownHTML = `
-                <div><span class="font-medium text-gray-600">Σ DAC Fraction:</span><p class="font-semibold">${totalDacFraction.toExponential(2)}</p></div>
-                <div><span class="font-medium text-gray-600">PFR:</span><p class="font-semibold">${pfr}</p></div>
-                <div><span class="font-medium text-gray-600">PFE:</span><p class="font-semibold">${pfe}</p></div>
-                <div class="md:col-span-2 bg-blue-100 p-2 rounded-md"><span class="font-medium text-blue-800">Collective Internal Dose (mrem):</span><p class="font-bold text-blue-800">${collectiveInternalDose.toExponential(2)}</p></div>
-            `;
-            setHTML('.calculation-breakdown', breakdownHTML);
-            
-            const collectiveEffectiveDose = collectiveExternalDose + collectiveInternalDose;
-            setVal('.task-total-effective-dose', collectiveEffectiveDose, 'fixed');
-
-            const individualEffectiveDose = workers > 0 ? collectiveEffectiveDose / workers : 0;
-            setVal('.task-individual-effective-dose', individualEffectiveDose, 'fixed');
-            
-            updateSummary();
-        }
-
-        function updateSummary() {
-            const tasks = document.querySelectorAll('.task-container');
-            const summaryBody = document.getElementById('summary-table-body');
-            summaryBody.innerHTML = '';
-            let totalIndividualEffectiveDose = 0;
-
-            if (tasks.length === 0) {
-                summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="5" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
-            } else {
-                tasks.forEach((task, index) => {
-                    const taskTitle = task.querySelector('.task-title').value || `Task ${task.dataset.taskId}`;
-                    const workers = parseFloat(task.querySelector('.workers-count').value) || 0;
-                    
-                    const collectiveExternal = parseFloat(task.querySelector('.external-dose-result').value) || 0;
-                    
-                    const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
-                    const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
-                    const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
-                    const mPIF = parseFloat(task.querySelector('.mpif-result').value) || 0;
-                    let totalDacFraction = 0;
-                    task.querySelectorAll('.nuclide-row').forEach(row => {
-                        const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
-                        const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
-                        const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
-                        totalDacFraction += (airConc / dac);
-                    });
-                    const collectiveInternal = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
-
-                    const individualExternal = workers > 0 ? collectiveExternal / workers : 0;
-                    const individualInternal = workers > 0 ? collectiveInternal / workers : 0;
-                    const individualTotal = individualExternal + individualInternal;
-                    
-                    totalIndividualEffectiveDose += individualTotal;
-
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-4 py-2 text-sm font-medium text-gray-900">${taskTitle}</td>
-                        <td class="px-4 py-2 text-sm text-gray-500">${workers}</td>
-                        <td class="px-4 py-2 text-sm text-gray-500">${individualExternal.toFixed(2)}</td>
-                        <td class="px-4 py-2 text-sm text-gray-500">${individualInternal.toExponential(2)}</td>
-                        <td class="px-4 py-2 text-sm font-semibold">${individualTotal.toFixed(2)}</td>`;
-                    summaryBody.appendChild(row);
-                });
-            }
-
-            document.getElementById('total-individual-dose-per-worker').value = totalIndividualEffectiveDose.toFixed(2);
-            const alaraCheck = document.getElementById('alara-2');
-            if (alaraCheck) alaraCheck.checked = totalIndividualEffectiveDose > 500;
-            updateChecklistAlerts();
-        }
-        
-        function updateChecklistAlerts() {
-            const airSamplingNeeded = Array.from(document.querySelectorAll('.air-sampling-check')).some(c => c.checked);
-            const airSamplingAlert = document.getElementById('airSamplingAlert');
-            if(airSamplingAlert) {
-                airSamplingAlert.style.display = airSamplingNeeded ? 'flex' : 'none';
-                document.getElementById('noAirSamplingAlert').style.display = airSamplingNeeded ? 'none' : 'flex';
-            }
-            const alaraReviewNeeded = Array.from(document.querySelectorAll('.alara-check')).some(c => c.checked);
-            const alaraAlert = document.getElementById('alaraAlert');
-            if(alaraAlert) {
-                alaraAlert.style.display = alaraReviewNeeded ? 'flex' : 'none';
-                document.getElementById('noAlaraAlert').style.display = alaraReviewNeeded ? 'none' : 'flex';
-            }
-        }
-
-        // --- SAVE/LOAD FUNCTIONALITY ---
-        function saveStateToFile() {
-            const state = {
-                projectInfo: {},
-                tasks: []
-            };
-
-            document.querySelectorAll('.project-info').forEach(el => {
-                state.projectInfo[el.id] = el.value;
-            });
-
-            document.querySelectorAll('.task-container').forEach(task => {
-                const taskData = {
-                    title: task.querySelector('.task-title').value,
-                    workers: task.querySelector('.workers-count').value,
-                    hours: task.querySelector('.hours-per-worker').value,
-                    mpifR: task.querySelector('.mpif-r').value,
-                    mpifC: task.querySelector('.mpif-c').value,
-                    mpifD: task.querySelector('.mpif-d').value,
-                    mpifS: task.querySelector('.mpif-s').value,
-                    mpifU: task.querySelector('.mpif-u').value,
-                    doseRate: task.querySelector('.dose-rate').value,
-                    pfr: task.querySelector('input[name^="resp-protection"]:checked').value,
-                    pfe: task.querySelector('input[name^="eng-control"]:checked').value,
-                    nuclides: []
-                };
-                task.querySelectorAll('.nuclide-row').forEach(row => {
-                    taskData.nuclides.push({
-                        name: row.querySelector('.nuclide-select').value,
-                        contam: row.querySelector('.nuclide-contam-level').value
-                    });
-                });
-                state.tasks.push(taskData);
-            });
-
-            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'dose-estimate.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function loadStateFromFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const state = JSON.parse(e.target.result);
-                
-                // Clear existing state
-                document.querySelectorAll('.task-container').forEach(t => t.remove());
-                document.querySelectorAll('.tab-button:not([data-target="summary-content"])').forEach(b => b.remove());
-                taskCounter = 0;
-                
-                // Load project info
-                for (const [id, value] of Object.entries(state.projectInfo)) {
-                    const el = document.getElementById(id);
-                    if (el) el.value = value;
-                }
-
-                // Load tasks
-                state.tasks.forEach(taskData => {
-                    addNewTask(taskData);
-                });
-
-                if(state.tasks.length === 0) {
-                     document.getElementById('empty-state').style.display = 'block';
-                }
-
-                updateSummary();
-            };
-            reader.readAsText(file);
         }
 
     </script>
