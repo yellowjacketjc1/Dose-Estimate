@@ -166,7 +166,7 @@
         const mainContentArea = document.getElementById('tab-content-area');
 
         document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('addNewTaskBtn').addEventListener('click', addNewTask);
+            document.getElementById('addNewTaskBtn').addEventListener('click', () => addNewTask());
             document.getElementById('printBtn').addEventListener('click', () => window.print());
             document.getElementById('saveBtn').addEventListener('click', saveStateToFile);
             document.getElementById('loadBtn').addEventListener('click', () => document.getElementById('loadFile').click());
