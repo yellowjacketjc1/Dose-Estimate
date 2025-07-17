@@ -202,14 +202,25 @@
             const cSelect = taskContainer.querySelector('.mpif-c');
             for (const [text, value] of Object.entries(CONFINEMENT_FACTORS)) { cSelect.add(new Option(text, value)); }
 
+            const defaultTitle = `Task ${taskCounter}`;
+            const taskTitleInput = taskContainer.querySelector('.task-title');
+
             mainContentArea.appendChild(template);
             document.getElementById('empty-state').style.display = 'none';
             const nav = document.getElementById('tab-nav');
             const taskButton = document.createElement('button');
             taskButton.className = 'tab-button task-tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
-            taskButton.textContent = (taskData && taskData.title) || `Task ${taskCounter}`;
             taskButton.dataset.target = `task-content-${taskCounter}`;
             taskButton.onclick = () => switchTab(taskButton);
+            
+            if (taskData && taskData.title) {
+                taskTitleInput.value = taskData.title;
+                taskButton.textContent = taskData.title;
+            } else {
+                taskTitleInput.value = defaultTitle;
+                taskButton.textContent = defaultTitle;
+            }
+            
             nav.appendChild(taskButton);
 
             if (taskData) {
@@ -232,7 +243,7 @@
                 if (el) el.checked = true;
             };
             
-            setValue('.task-title', taskData.title);
+            // The title is set in addNewTask, so we don't set it here again.
             setValue('.workers-count', taskData.workers);
             setValue('.hours-per-worker', taskData.hours);
             setValue('.mpif-r', taskData.mpifR);
@@ -287,25 +298,27 @@
         }
 
         function renumberTasks() {
-            document.querySelectorAll('.task-container').forEach((task, index) => {
+            const tasks = document.querySelectorAll('.task-container');
+            taskCounter = tasks.length;
+            tasks.forEach((task, index) => {
                 const newId = index + 1;
                 const oldId = task.dataset.taskId;
-                if (String(oldId) === String(newId)) return;
-
-                const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`);
                 
                 task.dataset.taskId = newId;
                 task.id = `task-content-${newId}`;
                 
+                const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`) || document.querySelector(`.tab-button[data-target="task-content-${newId}"]`);
                 if(tabButton) {
                     tabButton.dataset.target = `task-content-${newId}`;
-                    if (!task.querySelector('.task-title').value) {
-                         tabButton.textContent = `Task ${newId}`;
+                    const titleInput = task.querySelector('.task-title');
+                    if (titleInput.value.startsWith("Task ")) {
+                        const newTitle = `Task ${newId}`;
+                        titleInput.value = newTitle;
+                        tabButton.textContent = newTitle;
                     }
                 }
                 task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => el.name = el.name.replace('-'+oldId, '-'+newId));
             });
-            taskCounter = document.querySelectorAll('.task-container').length;
         }
 
         function switchTab(button) {
@@ -354,6 +367,7 @@
         }
 
         function calculateTaskTotals(task) {
+            if (!task) return;
             const getVal = (selector) => parseFloat(task.querySelector(selector)?.value) || 0;
             const getRadio = (name) => parseFloat(task.querySelector(`input[name^="${name}"]:checked`)?.value) || 1;
             const setVal = (selector, val, format) => {
@@ -418,7 +432,7 @@
                 summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="5" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
             } else {
                 tasks.forEach((task, index) => {
-                    const taskTitle = task.querySelector('.task-title').value || `Task ${index + 1}`;
+                    const taskTitle = task.querySelector('.task-title').value || `Task ${task.dataset.taskId}`;
                     const workers = parseFloat(task.querySelector('.workers-count').value) || 0;
                     
                     const collectiveExternal = parseFloat(task.querySelector('.external-dose-result').value) || 0;
