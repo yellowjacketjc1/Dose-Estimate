@@ -103,7 +103,7 @@
 
     <!-- Templates (Hidden) -->
     <template id="summary-template">
-        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Job Summary & Totals</h2></div><div class="toggle-content expanded"><div><div class="p-6"><h3 class="text-lg font-medium text-gray-800 mb-4">Dose Summary by Task</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Workers</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ind. Dose (mrem)</th></tr></thead><tbody id="summary-table-body" class="bg-white divide-y divide-gray-200"><tr id="no-tasks-row"><td colspan="6" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr></tbody></table></div><h3 class="text-lg font-medium text-gray-800 mt-6 mb-4">Total Individual Dose Estimate</h3><div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-bold text-blue-800">Total Estimated Dose Per Individual (mrem)</label><input id="total-individual-dose-per-worker" type="text" class="mt-1 block w-full bg-blue-100 text-blue-900 font-bold text-lg rounded-md border-blue-300" readonly></div></div></div></div></div>
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Job Summary & Totals</h2></div><div class="toggle-content expanded"><div><div class="p-6"><h3 class="text-lg font-medium text-gray-800 mb-4">Dose Summary by Task</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Workers</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DAC Fraction</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ind. Dose (mrem)</th></tr></thead><tbody id="summary-table-body" class="bg-white divide-y divide-gray-200"><tr id="no-tasks-row"><td colspan="9" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr></tbody></table></div><h3 class="text-lg font-medium text-gray-800 mt-6 mb-4">Total Individual Dose Estimate</h3><div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-bold text-blue-800">Total Estimated Dose Per Individual (mrem)</label><input id="total-individual-dose-per-worker" type="text" class="mt-1 block w-full bg-blue-100 text-blue-900 font-bold text-lg rounded-md border-blue-300" readonly></div></div></div></div></div>
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Workplace Air Sampling Triggers (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-1" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-1" class="font-medium text-gray-700">Any time a worker is likely to exceed 40 DAC-hours per year.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-2" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-2" class="font-medium text-gray-700">Any time respiratory protection devices have been prescribed.</label></div></div>
@@ -440,7 +440,7 @@
             let totalIndividualEffectiveDose = 0;
 
             if (tasks.length === 0) {
-                summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="6" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
+                summaryBody.innerHTML = '<tr id="no-tasks-row"><td colspan="9" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr>';
             } else {
                 tasks.forEach((task, index) => {
                     const taskTitle = task.querySelector('.task-title').value || `Write task name here`;
@@ -448,7 +448,8 @@
                     const workers = parseFloat(task.querySelector('.workers-count').value) || 0;
                     
                     const collectiveExternal = parseFloat(task.querySelector('.external-dose-result').value) || 0;
-                    
+                    const collectiveInternal = parseFloat(task.querySelector('.calculation-breakdown').textContent.match(/Total Collective Internal Dose.*?(\d+\.\d+[Ee][+-]\d+)/)?.[1]) || 0;
+
                     const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
                     const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
                     const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
@@ -458,9 +459,10 @@
                         const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
                         const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
                         const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
-                        totalDacFraction += (airConc / dac);
+                        const dacFractionRaw = (airConc / dac);
+                        const dacFraction = dacFractionRaw / pfe;
+                        totalDacFraction += dacFraction;
                     });
-                    const collectiveInternal = totalDacFraction * (hours / 2000) * 5000 / (pfr * pfe);
 
                     const individualExternal = workers > 0 ? collectiveExternal / workers : 0;
                     const individualInternal = workers > 0 ? collectiveInternal / workers : 0;
@@ -473,8 +475,11 @@
                         <td class="px-4 py-2 text-sm font-medium text-gray-900">${taskTitle}</td>
                         <td class="px-4 py-2 text-sm text-gray-500">${taskLocation}</td>
                         <td class="px-4 py-2 text-sm text-gray-500">${workers}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${totalDacFraction.toExponential(2)}</td>
                         <td class="px-4 py-2 text-sm text-gray-500">${individualExternal.toFixed(2)}</td>
                         <td class="px-4 py-2 text-sm text-gray-500">${individualInternal.toExponential(2)}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${collectiveExternal.toFixed(2)}</td>
+                        <td class="px-4 py-2 text-sm text-gray-500">${collectiveInternal.toExponential(2)}</td>
                         <td class="px-4 py-2 text-sm font-semibold">${individualTotal.toFixed(2)}</td>`;
                     summaryBody.appendChild(row);
                 });
