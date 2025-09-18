@@ -494,26 +494,51 @@
             let maxDacSpike = 0;
             let maxContamination = 0;
             let maxDoseRate = 0;
+            let totalWeightedDac = 0;
+            let totalHours = 0;
 
             tasks.forEach(task => {
                 const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
                 const mPIF = parseFloat(task.querySelector('.mpif-result').value) || 0;
                 const doseRate = parseFloat(task.querySelector('.dose-rate').value) || 0;
+                const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
+                const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
 
                 maxDoseRate = Math.max(maxDoseRate, doseRate);
+                totalHours += hours;
+
+                let taskDacFractionWithRespProtection = 0;
+                let taskDacFractionEngOnly = 0;
 
                 task.querySelectorAll('.nuclide-row').forEach(row => {
                     const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
                     const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
                     const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
-                    const dacFraction = (airConc / dac);
-                    const dacHrs = dacFraction * hours;
 
-                    maxDacHrs = Math.max(maxDacHrs, dacHrs);
-                    maxDacSpike = Math.max(maxDacSpike, dacFraction);
+                    // For DAC-hrs calculation: include both engineering and respiratory protection (what worker actually breathes)
+                    const dacFractionWithBothProtections = (airConc / dac) / (pfe * pfr);
+                    taskDacFractionWithRespProtection += dacFractionWithBothProtections;
+
+                    // For 0.3 DAC average calculation: only engineering controls
+                    const dacFractionEngOnly = (airConc / dac) / pfe;
+                    taskDacFractionEngOnly += dacFractionEngOnly;
+
                     maxContamination = Math.max(maxContamination, contamLevel / 1000);
                 });
+
+                // DAC-hrs calculation (with respiratory protection - what worker actually breathes)
+                const dacHrs = taskDacFractionWithRespProtection * hours;
+                maxDacHrs = Math.max(maxDacHrs, dacHrs);
+
+                // Spike calculation (engineering controls only)
+                maxDacSpike = Math.max(maxDacSpike, taskDacFractionEngOnly);
+
+                // Weighted average calculation for 0.3 DAC check (engineering controls only)
+                totalWeightedDac += taskDacFractionEngOnly * hours;
             });
+
+            // Calculate weighted average DAC over 40 hours
+            const weightedAvgDac = totalHours > 0 ? totalWeightedDac / totalHours : 0;
 
             const alaraCheck5 = document.getElementById('alara-5');
             if (alaraCheck5) alaraCheck5.checked = maxDacHrs > 200 || maxDacSpike > 1000;
@@ -523,6 +548,13 @@
 
             const alaraCheck8 = document.getElementById('alara-8');
             if (alaraCheck8) alaraCheck8.checked = maxDoseRate > 10000;
+
+            // Air sampling trigger checks
+            const sampling1 = document.getElementById('sampling-1');
+            if (sampling1) sampling1.checked = maxDacHrs > 40;
+
+            const sampling5 = document.getElementById('sampling-5');
+            if (sampling5) sampling5.checked = weightedAvgDac > 0.3;
 
             updateChecklistAlerts();
         }
