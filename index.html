@@ -405,7 +405,7 @@
                 const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
                 const dacFractionRaw = (airConc / dac);
                 const dacFraction = dacFractionRaw / pfe;
-                const nuclideDose = dacFraction * (hours / 2000) * 5000 / pfr;
+                const nuclideDose = dacFraction * (personHours / 2000) * 5000 / pfr;
                 const nuclideIndividualDose = workers > 0 ? nuclideDose / workers : 0;
 
                 totalDacFraction += dacFraction;
