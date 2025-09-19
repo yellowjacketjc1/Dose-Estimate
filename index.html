@@ -119,10 +119,10 @@
         </div><div class="mt-6"><div class="bg-red-50 border-l-4 border-red-400 p-4 flex items-start" id="airSamplingAlert" style="display: none;"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i><p class="text-sm text-red-700"><span class="font-semibold">Air Sampling Required</span></p></div><div class="bg-green-50 border-l-4 border-green-400 p-4 flex items-start" id="noAirSamplingAlert"><i class="fas fa-check-circle text-green-500 mr-3"></i><p class="text-sm text-green-700"><span class="font-semibold">No Air Sampling Required</span></p></div></div></div></div></div></div>
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>ALARA Trigger Review (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-1" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-1" class="font-medium text-gray-700">Non-routine or complex work.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-2" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-2" class="font-medium text-gray-700">Estimated individual total effective dose > 500 mrem per year.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-2" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-2" class="font-medium text-gray-700">Estimated individual total effective dose (TED) greater than 500 mrem per year or per job if less than one year (750 mrem per year or per job if less than one year for AGHCF).</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-3" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-3" class="font-medium text-gray-700">Estimated individual extremity or skin dose > 5000 mrem/year.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-4" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-4" class="font-medium text-gray-700">Collective dose > 750 person-mrem per year.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-5" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-5" class="font-medium text-gray-700">Anticipated airborne radioactivity > 200 DAC-hrs or spike > 1000 DAC.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-5" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-5" class="font-medium text-gray-700">Anticipated airborne radioactivity greater than 200 DAC averaged over 1 hour or spike in excess of 1000 DAC.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-6" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-6" class="font-medium text-gray-700">Removable contamination > 1000x Appendix D levels.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-7" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-7" class="font-medium text-gray-700">Worker likely to receive an internal dose exceeding 100 mrem.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-8" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-8" class="font-medium text-gray-700">Entry into areas with dose rates > 10 rem/hr at 30 cm.</label></div></div>
@@ -283,6 +283,13 @@
             taskData.nuclides.forEach(nuclideData => {
                 addNuclideRow(taskContainer.querySelector('.add-nuclide-btn'), nuclideData);
             });
+
+            // Restore extremity dose data
+            if (taskData.extremityDoses) {
+                taskData.extremityDoses.forEach(extremityData => {
+                    addExtremityRow(taskContainer.querySelector('.add-extremity-btn'), extremityData);
+                });
+            }
         }
 
         function addNuclideRow(button, nuclideData = null) {
@@ -582,8 +589,22 @@
             const alaraCheck2 = document.getElementById('alara-2');
             if (alaraCheck2) alaraCheck2.checked = totalIndividualEffectiveDose > 500;
 
+            // Check ALARA trigger for extremity dose > 5000 mrem
+            const alaraCheck3 = document.getElementById('alara-3');
+            if (alaraCheck3) alaraCheck3.checked = totalIndividualExtremityDose > 5000;
+
+            // Calculate total collective dose across all tasks and check ALARA trigger > 750 person-mrem
+            let totalCollectiveDose = 0;
+            tasks.forEach(task => {
+                const collectiveDose = parseFloat(task.querySelector('.task-total-effective-dose').value) || 0;
+                totalCollectiveDose += collectiveDose;
+            });
+            const alaraCheck4 = document.getElementById('alara-4');
+            if (alaraCheck4) alaraCheck4.checked = totalCollectiveDose > 750;
+
             let maxDacHrs = 0;
             let maxDacSpike = 0;
+            let maxDacHrsEngOnly = 0; // For ALARA trigger (engineering controls only)
             let maxContamination = 0;
             let maxDoseRate = 0;
             let maxTaskDacAvgOver40 = 0;
@@ -623,6 +644,10 @@
                 // Spike calculation (engineering controls only)
                 maxDacSpike = Math.max(maxDacSpike, taskDacFractionEngOnly);
 
+                // DAC-hrs calculation for ALARA trigger (engineering controls only, no respiratory protection)
+                const dacHrsEngOnly = taskDacFractionEngOnly * hours;
+                maxDacHrsEngOnly = Math.max(maxDacHrsEngOnly, dacHrsEngOnly);
+
                 // Calculate this task's DAC-hours averaged over 40 hours
                 const taskDacHours = taskDacFractionEngOnly * hours;
                 const taskDacAvgOver40 = taskDacHours / 40; // Average over 40 hours
@@ -631,13 +656,25 @@
 
 
             const alaraCheck5 = document.getElementById('alara-5');
-            if (alaraCheck5) alaraCheck5.checked = maxDacHrs > 200 || maxDacSpike > 1000;
+            if (alaraCheck5) alaraCheck5.checked = maxDacHrsEngOnly > 200 || maxDacSpike > 1000;
 
             const alaraCheck6 = document.getElementById('alara-6');
             if (alaraCheck6) alaraCheck6.checked = maxContamination > 1;
 
             const alaraCheck8 = document.getElementById('alara-8');
             if (alaraCheck8) alaraCheck8.checked = maxDoseRate > 10000;
+
+            // Calculate total internal dose only for ALARA trigger (exclude external dose)
+            let totalInternalDoseOnly = 0;
+            tasks.forEach(task => {
+                const collectiveInternal = parseFloat(task.querySelector('.calculation-breakdown').textContent.match(/Total Collective Internal Dose.*?(\d+\.\d+[Ee][+-]\d+)/)?.[1]) || 0;
+                const workers = parseFloat(task.querySelector('.workers-count').value) || 1;
+                const individualInternal = workers > 0 ? collectiveInternal / workers : 0;
+                totalInternalDoseOnly += individualInternal;
+            });
+
+            const alaraCheck7 = document.getElementById('alara-7');
+            if (alaraCheck7) alaraCheck7.checked = totalInternalDoseOnly > 100;
 
             // Air sampling trigger checks
             const sampling1 = document.getElementById('sampling-1');
@@ -667,16 +704,18 @@
             const sampling2 = document.getElementById('sampling-2');
             if (sampling2) sampling2.checked = respiratoryProtectionUsed;
 
-            // Check if any individual dose exceeds 500 mrem
-            let individualDoseExceeds500 = false;
+            // Check if any individual internal dose exceeds 500 mrem (10% of ALI)
+            let individualInternalDoseExceeds500 = false;
             tasks.forEach(task => {
-                const individualDose = parseFloat(task.querySelector('.task-individual-effective-dose').value) || 0;
-                if (individualDose > 500) {
-                    individualDoseExceeds500 = true;
+                const collectiveInternal = parseFloat(task.querySelector('.calculation-breakdown').textContent.match(/Total Collective Internal Dose.*?(\d+\.\d+[Ee][+-]\d+)/)?.[1]) || 0;
+                const workers = parseFloat(task.querySelector('.workers-count').value) || 1;
+                const individualInternalDose = workers > 0 ? collectiveInternal / workers : 0;
+                if (individualInternalDose > 500) {
+                    individualInternalDoseExceeds500 = true;
                 }
             });
             const sampling4 = document.getElementById('sampling-4');
-            if (sampling4) sampling4.checked = individualDoseExceeds500;
+            if (sampling4) sampling4.checked = individualInternalDoseExceeds500;
 
             // Check if any worker receives more than 40 DAC-hours in a week (CAMS trigger)
             // For a 40-hour work week, we need to check if any single task's DAC-hours > 40
@@ -755,6 +794,17 @@
                         contam: row.querySelector('.nuclide-contam-level').value
                     });
                 });
+
+                // Save extremity dose data
+                taskData.extremityDoses = [];
+                task.querySelectorAll('.extremity-row').forEach(row => {
+                    taskData.extremityDoses.push({
+                        nuclide: row.querySelector('.extremity-nuclide-select').value,
+                        doseRate: row.querySelector('.extremity-dose-rate').value,
+                        time: row.querySelector('.extremity-time-per-worker').value
+                    });
+                });
+
                 state.tasks.push(taskData);
             });
 
