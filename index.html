@@ -105,14 +105,17 @@
     <template id="summary-template">
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Job Summary & Totals</h2></div><div class="toggle-content expanded"><div><div class="p-6"><h3 class="text-lg font-medium text-gray-800 mb-4">Dose Summary by Task</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Workers</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DAC Fraction</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ind. Dose (mrem)</th></tr></thead><tbody id="summary-table-body" class="bg-white divide-y divide-gray-200"><tr id="no-tasks-row"><td colspan="9" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr></tbody></table></div><h3 class="text-lg font-medium text-gray-800 mt-6 mb-4">Total Individual Dose Estimate</h3><div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-bold text-blue-800">Total Estimated Dose Per Individual (mrem)</label><input id="total-individual-dose-per-worker" type="text" class="mt-1 block w-full bg-blue-100 text-blue-900 font-bold text-lg rounded-md border-blue-300" readonly></div></div></div></div></div>
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Workplace Air Sampling Triggers (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-1" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-1" class="font-medium text-gray-700">Any time a worker is likely to exceed 40 DAC-hours per year.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-2" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-2" class="font-medium text-gray-700">Any time respiratory protection devices have been prescribed.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-3" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-3" class="font-medium text-gray-700">Any time an air sample is needed to estimate internal dose.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-4" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-4" class="font-medium text-gray-700">Any time a worker’s estimated annual intake is expected to exceed 10% of the ALI or 500 mrem.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-5" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-5" class="font-medium text-gray-700">Estimated airborne concentration is expected to exceed 0.3 DAC averaged over 40 hours.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-6" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-6" class="font-medium text-gray-700">During any work or operation known or expected to cause airborne radioactivity (e.g., grinding, welding, cutting).</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-7" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-7" class="font-medium text-gray-700">During any work or operation that involves the breach of a radioactive system.</label></div></div>
-            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-8" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-8" class="font-medium text-gray-700">Any time the RSO or designee deems necessary.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-1" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-1" class="font-medium text-gray-700">Any time a worker is likely to exceed 40 DAC-hours per year (air sampling must be representative of breathing zone).</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-2" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-2" class="font-medium text-gray-700">Any time respiratory protection devices have been prescribed (air sampling must be representative of breathing zone).</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-3" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-3" class="font-medium text-gray-700">Any time an air sample is needed to estimate internal dose (air sampling must be representative of breathing zone).</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-4" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-4" class="font-medium text-gray-700">Any time a worker's estimated annual intake is expected to exceed 10% of the annual limit on intake (ALI) or 500 mrem.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-5" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-5" class="font-medium text-gray-700">Any time an estimated airborne concentration is expected to exceed 0.3 DAC averaged over 40 hours (i.e., greater than 12 DAC-hours in a week) or the estimated airborne concentration is expected to exceed 1 DAC at any time.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="cams-trigger" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="cams-trigger" class="font-medium text-gray-700">CAMs are required to be deployed any time a worker is likely to exceed 40 DAC-hours in a week.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-7" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-7" class="font-medium text-gray-700">At the conclusion of a job in order to de-post an Airborne Radioactivity Area.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-boundary" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-boundary" class="font-medium text-gray-700">At the boundary of an Airborne Radioactivity Area when: • There is no physical boundary (e.g. wall or door) confining the air space, and • It has not been verified that airflow is negative into the ARA.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-6" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-6" class="font-medium text-gray-700">During any work or operation known or expected to cause airborne radioactivity, such as grinding, welding, burning, cutting, hydrolazing, vacuuming, sweeping, use of compressed air, use of volatiles on contaminated equipment, or breaching a radioactive system.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-6b" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-6b" class="font-medium text-gray-700">During any work or operation that involves the use of engineering controls such as containment or localized ventilation, unless additional methods, such as retrospective air sampling, are utilized to verify adequacy of the engineering controls.</label></div></div>
+            <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-8" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-8" class="font-medium text-gray-700">Any time the radiological safety officer (RSO) or designee deems necessary based on historical information, past work experience, or professional judgment.</label></div></div>
         </div><div class="mt-6"><div class="bg-red-50 border-l-4 border-red-400 p-4 flex items-start" id="airSamplingAlert" style="display: none;"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i><p class="text-sm text-red-700"><span class="font-semibold">Air Sampling Required</span></p></div><div class="bg-green-50 border-l-4 border-green-400 p-4 flex items-start" id="noAirSamplingAlert"><i class="fas fa-check-circle text-green-500 mr-3"></i><p class="text-sm text-green-700"><span class="font-semibold">No Air Sampling Required</span></p></div></div></div></div></div></div>
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>ALARA Trigger Review (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-1" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-1" class="font-medium text-gray-700">Non-routine or complex work.</label></div></div>
@@ -494,8 +497,7 @@
             let maxDacSpike = 0;
             let maxContamination = 0;
             let maxDoseRate = 0;
-            let totalWeightedDac = 0;
-            let totalHours = 0;
+            let maxTaskDacAvgOver40 = 0;
 
             tasks.forEach(task => {
                 const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
@@ -505,7 +507,6 @@
                 const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
 
                 maxDoseRate = Math.max(maxDoseRate, doseRate);
-                totalHours += hours;
 
                 let taskDacFractionWithRespProtection = 0;
                 let taskDacFractionEngOnly = 0;
@@ -533,12 +534,12 @@
                 // Spike calculation (engineering controls only)
                 maxDacSpike = Math.max(maxDacSpike, taskDacFractionEngOnly);
 
-                // Weighted average calculation for 0.3 DAC check (engineering controls only)
-                totalWeightedDac += taskDacFractionEngOnly * hours;
+                // Calculate this task's DAC-hours averaged over 40 hours
+                const taskDacHours = taskDacFractionEngOnly * hours;
+                const taskDacAvgOver40 = taskDacHours / 40; // Average over 40 hours
+                maxTaskDacAvgOver40 = Math.max(maxTaskDacAvgOver40, taskDacAvgOver40);
             });
 
-            // Calculate weighted average DAC over 40 hours
-            const weightedAvgDac = totalHours > 0 ? totalWeightedDac / totalHours : 0;
 
             const alaraCheck5 = document.getElementById('alara-5');
             if (alaraCheck5) alaraCheck5.checked = maxDacHrs > 200 || maxDacSpike > 1000;
@@ -554,7 +555,65 @@
             if (sampling1) sampling1.checked = maxDacHrs > 40;
 
             const sampling5 = document.getElementById('sampling-5');
-            if (sampling5) sampling5.checked = weightedAvgDac > 0.3;
+            // Check for two conditions:
+            // 1. Maximum task DAC-hours averaged over 40 hours > 0.3 DAC
+            // 2. Any task > 1 DAC at any time (spike)
+            const condition1 = maxTaskDacAvgOver40 > 0.3;
+            const condition2 = maxDacSpike > 1.0;
+            const sampling5Triggered = condition1 || condition2;
+            if (sampling5) sampling5.checked = sampling5Triggered;
+
+            // Auto-check sampling-7 (de-post ARA) if sampling-5 is triggered
+            const sampling7 = document.getElementById('sampling-7');
+            if (sampling7) sampling7.checked = sampling5Triggered;
+
+            // Check if any task uses respiratory protection (APR or PAPR)
+            let respiratoryProtectionUsed = false;
+            tasks.forEach(task => {
+                const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
+                if (pfr > 1) { // APR=50 or PAPR=1000, both > 1
+                    respiratoryProtectionUsed = true;
+                }
+            });
+            const sampling2 = document.getElementById('sampling-2');
+            if (sampling2) sampling2.checked = respiratoryProtectionUsed;
+
+            // Check if any individual dose exceeds 500 mrem
+            let individualDoseExceeds500 = false;
+            tasks.forEach(task => {
+                const individualDose = parseFloat(task.querySelector('.task-individual-effective-dose').value) || 0;
+                if (individualDose > 500) {
+                    individualDoseExceeds500 = true;
+                }
+            });
+            const sampling4 = document.getElementById('sampling-4');
+            if (sampling4) sampling4.checked = individualDoseExceeds500;
+
+            // Check if any worker receives more than 40 DAC-hours in a week (CAMS trigger)
+            // For a 40-hour work week, we need to check if any single task's DAC-hours > 40
+            let camsRequired = false;
+            tasks.forEach(task => {
+                const hours = parseFloat(task.querySelector('.hours-per-worker').value) || 0;
+                const pfr = parseFloat(task.querySelector('input[name^="resp-protection"]:checked').value) || 1;
+                const pfe = parseFloat(task.querySelector('input[name^="eng-control"]:checked').value) || 1;
+
+                let taskDacFractionWithRespProtection = 0;
+                task.querySelectorAll('.nuclide-row').forEach(row => {
+                    const contamLevel = parseFloat(row.querySelector('.nuclide-contam-level').value) || 0;
+                    const dac = parseFloat(row.querySelector('.nuclide-dac').value) || 1e-12;
+                    const mPIF = parseFloat(task.querySelector('.mpif-result').value) || 0;
+                    const airConc = (contamLevel / 100) * mPIF * (1/100) * (1 / 2.22e6);
+                    const dacFractionWithBothProtections = (airConc / dac) / (pfe * pfr);
+                    taskDacFractionWithRespProtection += dacFractionWithBothProtections;
+                });
+
+                const taskDacHours = taskDacFractionWithRespProtection * hours;
+                if (taskDacHours > 40) {
+                    camsRequired = true;
+                }
+            });
+            const camsTrigger = document.getElementById('cams-trigger');
+            if (camsTrigger) camsTrigger.checked = camsRequired;
 
             updateChecklistAlerts();
         }
