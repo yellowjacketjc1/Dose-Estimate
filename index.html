@@ -78,7 +78,6 @@
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <input type="text" id="workOrder" placeholder="Work Control Document Number" class="project-info block w-full rounded-md border-gray-300 shadow-sm">
-                    <input type="text" id="location" placeholder="Location*" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
                     <input type="date" id="date" class="project-info block w-full rounded-md border-gray-300 shadow-sm" required>
                 </div>
                 <textarea id="description" rows="3" placeholder="Work Description*" class="project-info mt-4 block w-full rounded-md border-gray-300 shadow-sm" required></textarea>
@@ -104,7 +103,7 @@
     <!-- Templates (Hidden) -->
     <template id="summary-template">
         <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold"><h2>Job Summary & Totals</h2></div><div class="toggle-content expanded"><div><div class="p-6"><h3 class="text-lg font-medium text-gray-800 mb-4">Dose Summary by Task</h3><div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Task</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"># Workers</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">DAC Fraction</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ind. Extremity/Skin (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective External (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Collective Internal (mrem)</th><th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Ind. Dose (mrem)</th></tr></thead><tbody id="summary-table-body" class="bg-white divide-y divide-gray-200"><tr id="no-tasks-row"><td colspan="10" class="px-4 py-4 text-center text-gray-500">No tasks added.</td></tr></tbody></table></div><h3 class="text-lg font-medium text-gray-800 mt-6 mb-4">Total Individual Dose Estimate</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="p-4 bg-blue-50 rounded-lg"><label class="block text-sm font-bold text-blue-800">Total Estimated Effective Dose Per Individual (mrem)</label><input id="total-individual-dose-per-worker" type="text" class="mt-1 block w-full bg-blue-100 text-blue-900 font-bold text-lg rounded-md border-blue-300" readonly></div><div class="p-4 bg-purple-50 rounded-lg"><label class="block text-sm font-bold text-purple-800">Total Estimated Extremity/Skin Dose Per Individual (mrem)</label><input id="total-individual-extremity-dose-per-worker" type="text" class="mt-1 block w-full bg-purple-100 text-purple-900 font-bold text-lg rounded-md border-purple-300" readonly></div></div></div></div></div></div>
-        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Workplace Air Sampling Triggers (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Workplace Air Sampling Triggers</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-1" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-1" class="font-medium text-gray-700">Any time a worker is likely to exceed 40 DAC-hours per year (air sampling must be representative of breathing zone).</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-2" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-2" class="font-medium text-gray-700">Any time respiratory protection devices have been prescribed (air sampling must be representative of breathing zone).</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-3" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-3" class="font-medium text-gray-700">Any time an air sample is needed to estimate internal dose (air sampling must be representative of breathing zone).</label></div></div>
@@ -117,7 +116,7 @@
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-6b" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-6b" class="font-medium text-gray-700">During any work or operation that involves the use of engineering controls such as containment or localized ventilation, unless additional methods, such as retrospective air sampling, are utilized to verify adequacy of the engineering controls.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="sampling-8" type="checkbox" class="air-sampling-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="sampling-8" class="font-medium text-gray-700">Any time the radiological safety officer (RSO) or designee deems necessary based on historical information, past work experience, or professional judgment.</label></div></div>
         </div><div class="mt-6"><div class="bg-red-50 border-l-4 border-red-400 p-4 flex items-start" id="airSamplingAlert" style="display: none;"><i class="fas fa-exclamation-circle text-red-500 mr-3"></i><p class="text-sm text-red-700"><span class="font-semibold">Air Sampling Required</span></p></div><div class="bg-green-50 border-l-4 border-green-400 p-4 flex items-start" id="noAirSamplingAlert"><i class="fas fa-check-circle text-green-500 mr-3"></i><p class="text-sm text-green-700"><span class="font-semibold">No Air Sampling Required</span></p></div></div></div></div></div></div>
-        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>ALARA Trigger Review (Overall)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
+        <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>ALARA Trigger Review</h2></div><div class="toggle-content"><div><div class="p-6"><div class="space-y-4">
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-1" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-1" class="font-medium text-gray-700">Non-routine or complex work.</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-2" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-2" class="font-medium text-gray-700">Estimated individual total effective dose (TED) greater than 500 mrem per year or per job if less than one year (750 mrem per year or per job if less than one year for AGHCF).</label></div></div>
             <div class="flex items-start"><div class="flex items-center h-5"><input id="alara-3" type="checkbox" class="alara-check h-4 w-4" onchange="updateChecklistAlerts()"></div><div class="ml-3 text-sm"><label for="alara-3" class="font-medium text-gray-700">Estimated individual extremity or skin dose > 5000 mrem/year.</label></div></div>
@@ -146,7 +145,7 @@
             </div></div></div></div>
             <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>External Dose Estimate</h2></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div><label class="block text-sm font-medium text-gray-700">Dose Rate (mrem/hr)</label><input type="number" min="0" step="0.01" value="0" class="dose-rate mt-1 block w-full rounded-md border-gray-300 shadow-sm"></div><div><label class="block text-sm font-medium text-gray-700">Person-Hours</label><input type="text" class="dose-person-hours mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-200" readonly></div><div><label class="block text-sm font-medium text-gray-700">Collective External Dose (mrem)</label><input type="text" class="external-dose-result mt-1 block w-full rounded-md border-gray-300 shadow-sm bg-gray-50" readonly></div></div></div></div></div></div>
             <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Extremity/Skin Dose Estimate</h2></div><div class="toggle-content"><div><div class="p-6"><div class="extremity-container space-y-4"></div><button class="add-extremity-btn mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200"><i class="fas fa-plus mr-2"></i>Add Extremity/Skin Dose</button><div class="mt-6 border-t pt-4"><h4 class="text-md font-semibold text-gray-800 mb-2">Extremity/Skin Dose Summary</h4><div class="extremity-summary p-4 bg-gray-50 rounded-lg"><div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm"><div><span class="font-medium text-gray-600">Total Extremity/Skin Dose (mrem):</span><p class="font-semibold task-total-extremity-dose">0.00</p></div><div><span class="font-medium text-gray-600">Individual Extremity/Skin Dose (mrem):</span><p class="font-semibold task-individual-extremity-dose">0.00</p></div></div></div></div></div></div></div></div>
-            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Protection Factors (For this task)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Respiratory (PFR)</h3><div class="space-y-4"><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" checked class="resp-protection h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">None (PFR=1)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="50"><label class="ml-3 font-medium text-gray-700">APR (PFR=50)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">PAPR (PFR=1000)</label></div></div></div><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Engineering (PFE)</h3><div class="space-y-4"><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" checked class="eng-control h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">No Controls (PFE=1)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">Type I (PFE=1,000)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="100000"><label class="ml-3 font-medium text-gray-700">Type II (PFE=100,000)</label></div></div></div></div></div></div></div>
+            <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Protection Factors (For this task)</h2></div><div class="toggle-content"><div><div class="p-6"><div class="grid grid-cols-1 md:grid-cols-2 gap-6"><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Respiratory (PFR)</h3><div class="space-y-4"><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" checked class="resp-protection h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">None (PFR=1)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="50"><label class="ml-3 font-medium text-gray-700">APR (PFR=50)</label></div><div class="flex items-center"><input name="resp-protection-{taskId}" type="radio" class="resp-protection h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">PAPR (PFR=1000)</label></div></div></div><div class="border border-gray-200 rounded-lg p-4"><h3 class="font-medium text-lg text-gray-800 mb-3">Engineering (PFE)</h3><div class="space-y-4"><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" checked class="eng-control h-4 w-4" value="1"><label class="ml-3 font-medium text-gray-700">No Controls (PFE=1)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="1000"><label class="ml-3 font-medium text-gray-700">Type I (PFE=1,000)</label></div><div class="flex items-center"><input name="eng-control-{taskId}" type="radio" class="eng-control h-4 w-4" value="100000"><label class="ml-3 font-medium text-gray-700">Type II (PFE=100,000)</label></div></div></div></div></div></div></div></div>
             <div class="bg-white rounded-lg shadow-md mb-8 overflow-hidden"><div class="bg-blue-700 text-white px-4 py-3 font-semibold flex justify-between items-center cursor-pointer toggle-label" onclick="toggleSection(this)"><h2>Internal Dose Calculation</h2></div><div class="toggle-content"><div><div class="p-6"><div class="nuclides-container space-y-4"></div><button class="add-nuclide-btn mt-4 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"><i class="fas fa-plus mr-2"></i>Add Nuclide</button><div class="mt-6 border-t pt-4"><h4 class="text-md font-semibold text-gray-800 mb-2">Internal Dose Breakdown</h4><div class="calculation-breakdown p-4 bg-gray-50 rounded-lg grid grid-cols-2 md:grid-cols-4 gap-4 text-sm"></div></div></div></div></div></div>
             <div class="bg-white rounded-lg shadow-md mb-8 p-4 border-t-4 border-green-500"><h3 class="text-lg font-semibold text-gray-800 mb-2">Task Totals</h3><div class="grid grid-cols-1 md:grid-cols-3 gap-4"><div class="bg-gray-100 p-3 rounded-md"><label class="block text-sm font-medium text-gray-700">Collective Effective Dose (mrem)</label><input type="text" class="task-total-effective-dose mt-1 block w-full rounded-md bg-gray-200" readonly></div><div class="bg-green-100 p-3 rounded-md"><label class="block text-sm font-bold text-green-800">Individual Effective Dose (mrem)</label><input type="text" class="task-individual-effective-dose mt-1 block w-full rounded-md bg-green-200 font-bold" readonly></div><div class="bg-purple-100 p-3 rounded-md"><label class="block text-sm font-bold text-purple-800">Individual Extremity/Skin Dose (mrem)</label><input type="text" class="task-individual-extremity-dose-input mt-1 block w-full rounded-md bg-purple-200 font-bold" readonly></div></div></div>
         </div>
@@ -215,12 +214,14 @@
 
         function addSummaryTab() {
             const nav = document.getElementById('tab-nav');
+            const addNewTaskBtn = document.getElementById('addNewTaskBtn');
             const summaryButton = document.createElement('button');
             summaryButton.className = 'tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
             summaryButton.textContent = 'Summary';
             summaryButton.dataset.target = 'summary-content';
             summaryButton.onclick = () => switchTab(summaryButton);
-            nav.appendChild(summaryButton);
+            // Insert before the "Add New Task" button to keep it at the right
+            nav.insertBefore(summaryButton, addNewTaskBtn);
             document.getElementById('summary-content').innerHTML = document.getElementById('summary-template').innerHTML;
         }
 
@@ -240,12 +241,21 @@
             mainContentArea.appendChild(template);
             document.getElementById('empty-state').style.display = 'none';
             const nav = document.getElementById('tab-nav');
+            const addNewTaskBtn = document.getElementById('addNewTaskBtn');
             const taskButton = document.createElement('button');
             taskButton.className = 'tab-button task-tab-button px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 border-transparent';
-            taskButton.textContent = (taskData && taskData.title) ? taskData.title : `Task ${taskCounter}`;
+
+            // Create numbered task text - always add number prefix
+            const taskText = (taskData && taskData.title && taskData.title !== `Task ${taskCounter}`)
+                ? `${taskCounter}. ${taskData.title}`
+                : `${taskCounter}. Task ${taskCounter}`;
+            taskButton.textContent = taskText;
+
             taskButton.dataset.target = `task-content-${taskCounter}`;
             taskButton.onclick = () => switchTab(taskButton);
-            nav.appendChild(taskButton);
+
+            // Insert before the "Add New Task" button to keep it at the right
+            nav.insertBefore(taskButton, addNewTaskBtn);
 
             if (taskData) {
                 populateTaskData(taskContainer, taskData);
@@ -267,8 +277,8 @@
                 if (el) el.checked = true;
             };
             
-            setValue('.task-title', taskData.title);
-            setValue('.task-location', taskData.location);
+            setValue('.task-title', taskData.title || '');
+            setValue('.task-location', taskData.location || '');
             setValue('.workers-count', taskData.workers);
             setValue('.hours-per-worker', taskData.hours);
             setValue('.mpif-r', taskData.mpifR);
@@ -376,16 +386,28 @@
             document.querySelectorAll('.task-container').forEach((task, index) => {
                 const newId = index + 1;
                 const oldId = task.dataset.taskId;
-                if (String(oldId) === String(newId)) return;
+
+                // Update task container
                 task.dataset.taskId = newId;
                 task.id = `task-content-${newId}`;
+
+                // Update tab button
                 const tabButton = document.querySelector(`.tab-button[data-target="task-content-${oldId}"]`);
                 if(tabButton) {
-                    if (!task.querySelector('.task-title').value) {
-                         tabButton.textContent = `Task ${newId}`;
-                    }
+                    tabButton.dataset.target = `task-content-${newId}`;
+
+                    // Update tab text with proper numbering
+                    const taskTitle = task.querySelector('.task-title').value || `Task ${newId}`;
+                    tabButton.textContent = `${newId}. ${taskTitle}`;
                 }
-                task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => el.name = el.name.replace('-'+oldId, '-'+newId));
+
+                // Update all form element names and IDs that contain the old task ID
+                task.querySelectorAll('[name*="-'+ oldId +'"]').forEach(el => {
+                    el.name = el.name.replace('-'+oldId, '-'+newId);
+                });
+                task.querySelectorAll('[id*="-'+ oldId +'"]').forEach(el => {
+                    el.id = el.id.replace('-'+oldId, '-'+newId);
+                });
             });
             taskCounter = document.querySelectorAll('.task-container').length;
         }
@@ -412,7 +434,9 @@
                 if (event.target.matches('.task-title')) {
                     const tabButton = document.querySelector(`.tab-button[data-target="${taskContainer.id}"]`);
                     if (tabButton) {
-                        tabButton.textContent = event.target.value || `Task ${taskContainer.dataset.taskId}`;
+                        const taskId = taskContainer.dataset.taskId;
+                        const taskTitle = event.target.value || `Task ${taskId}`;
+                        tabButton.textContent = `${taskId}. ${taskTitle}`;
                     }
                 }
             }
