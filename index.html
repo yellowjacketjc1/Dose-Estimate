@@ -29,6 +29,15 @@
         }
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type="number"] { -moz-appearance: textfield; }
+        /* Outline text boxes and form elements for better visibility */
+        input[type="text"], input[type="number"], input[type="date"], textarea, select {
+            border: 2px solid #d1d5db !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+        }
+        input[type="text"]:focus, input[type="number"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+        }
         .tab-content-pane { display: none; }
         .tab-content-pane.active { display: block; }
         
@@ -137,9 +146,9 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
                     <div><label class="block text-sm font-medium text-gray-700">Release Factor (R)</label><p class="text-xs text-gray-500">Fraction of material that is potentially releasable.</p><select class="mpif-r mt-1 block w-full rounded-md"></select></div>
                     <div><label class="block text-sm font-medium text-gray-700">Confinement Factor (C)</label><p class="text-xs text-gray-500">Effectiveness of confinement barriers.</p><select class="mpif-c mt-1 block w-full rounded-md"></select></div>
-                    <div><label class="block text-sm font-medium text-gray-700">Dispersibility Factor (D)</label><p class="text-xs text-gray-500">Set to 10 for actions that add energy (heat, grind, etc.).</p><input type="number" value="1" min="1" max="10" step="any" class="mpif-d mt-1 block w-full rounded-md"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">Special Form Factor (S)</label><p class="text-xs text-gray-500">Set to 0.1 for large particles with poor uptake.</p><input type="number" value="1" min="1" max="10" step="any" class="mpif-s mt-1 block w-full rounded-md"></div>
-                    <div><label class="block text-sm font-medium text-gray-700">Uncertainty Factor (U)</label><p class="text-xs text-gray-500">Up to 10 if radionuclides are not well known.</p><input type="number" value="1" min="1" max="10" step="any" class="mpif-u mt-1 block w-full rounded-md"></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Dispersibility Factor (D)</label><p class="text-xs text-gray-500">Set to 10 for actions that add energy (heat, grind, etc.).</p><select class="mpif-d mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Special Form Factor (S)</label><p class="text-xs text-gray-500">Set to 0.1 for large particles with poor uptake.</p><select class="mpif-s mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="0.1">0.1</option><option value="0.2">0.2</option><option value="0.3">0.3</option><option value="0.4">0.4</option><option value="0.5">0.5</option><option value="0.6">0.6</option><option value="0.7">0.7</option><option value="0.8">0.8</option><option value="0.9">0.9</option><option value="1">1</option></select></div>
+                    <div><label class="block text-sm font-medium text-gray-700">Uncertainty Factor (U)</label><p class="text-xs text-gray-500">Up to 10 if radionuclides are not well known.</p><select class="mpif-u mt-1 block w-full rounded-md border-gray-300 shadow-sm"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option></select></div>
                     <div class="bg-gray-100 p-3 rounded-md text-center"><label class="block text-sm font-medium">Calculated mPIF (m⁻¹)</label><input type="text" class="mpif-result mt-1 w-full mx-auto block text-center font-bold bg-gray-200 rounded-md" readonly></div>
                 </div>
             </div></div></div></div>
@@ -423,12 +432,7 @@
         function handleTaskInput(event) {
             const taskContainer = event.target.closest('.task-container');
             if (taskContainer) {
-                // Clamp mPIF inputs
-                if(event.target.matches('.mpif-d, .mpif-s, .mpif-u')) {
-                    const val = parseFloat(event.target.value);
-                    if (val > 10) event.target.value = 10;
-                    if (val < 1) event.target.value = 1;
-                }
+                // No longer need to clamp mPIF inputs since they're now dropdowns
 
                 calculateTaskTotals(taskContainer);
                 if (event.target.matches('.task-title')) {
