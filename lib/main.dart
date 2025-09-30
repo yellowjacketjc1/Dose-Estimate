@@ -418,6 +418,21 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
 
   void addTask([TaskData? data]) {
     setState(() {
+      // If no explicit data provided and there are existing tasks, copy nuclides from first task
+      if (data == null && tasks.isNotEmpty) {
+        // Copy nuclide selections from the first task
+        final firstTaskNuclides = tasks.first.nuclides;
+        final copiedNuclides = firstTaskNuclides.map((n) {
+          return NuclideEntry(
+            name: n.name,
+            contam: 0.0, // Reset contamination to 0.0 so user must enter new values
+            customDAC: n.customDAC, // Preserve custom DAC if "Other" was used
+          );
+        }).toList();
+
+        data = TaskData(nuclides: copiedNuclides);
+      }
+
       tasks.add(data ?? TaskData());
       tabController = TabController(length: tasks.length + 1, vsync: this);
       tabController.index = tasks.length; // switch to new task tab
