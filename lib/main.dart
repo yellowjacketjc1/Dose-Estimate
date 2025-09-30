@@ -1868,12 +1868,46 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(height: 16),
-                        Text(
-                          '${tasks.fold<double>(0, (sum, t) => sum + calculateTaskTotals(t)['totalExtremityDose']!).toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Colors.orange),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('person-mrem', style: TextStyle(fontSize: 12, color: Colors.black54, fontWeight: FontWeight.w600)),
+                        // Individual and Collective side by side
+                        Row(children: [
+                          Expanded(child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.deepOrange.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.deepOrange.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('INDIVIDUAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.deepOrange.shade800)),
+                                const SizedBox(height: 4),
+                                Text('${tasks.fold<double>(0, (sum, t) => sum + calculateTaskTotals(t)['individualExtremity']!).toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.deepOrange.shade800)),
+                                const SizedBox(height: 2),
+                                Text('mrem/person', style: TextStyle(fontSize: 9, color: Colors.deepOrange.shade700)),
+                              ],
+                            ),
+                          )),
+                          const SizedBox(width: 8),
+                          Expanded(child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('COLLECTIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.red.shade800)),
+                                const SizedBox(height: 4),
+                                Text('${tasks.fold<double>(0, (sum, t) => sum + calculateTaskTotals(t)['collectiveExtremity']!).toStringAsFixed(2)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.red.shade800)),
+                                const SizedBox(height: 2),
+                                Text('person-mrem', style: TextStyle(fontSize: 9, color: Colors.red.shade700)),
+                              ],
+                            ),
+                          )),
+                        ]),
                       ],
                     ),
                   ),
