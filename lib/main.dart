@@ -597,7 +597,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       final individualExternal = workers > 0 ? (totals['collectiveExternal']! / workers) : 0.0;
       final individualInternal = workers > 0 ? (totals['collectiveInternal']! / workers) : 0.0;
       totalIndividualEffectiveDose += individualExternal + individualInternal;
-      totalIndividualExtremityDose += workers > 0 ? (totals['totalExtremityDose']! / workers) : 0.0;
+      totalIndividualExtremityDose += totals['individualExtremity']!;
       totalCollectiveDose += totals['collectiveEffective']!;
 
       maxDoseRate = maxDoseRate > t.doseRate ? maxDoseRate : t.doseRate;
@@ -992,7 +992,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
         final workers = t.workers;
         final individualExternal = workers > 0 ? (totals['collectiveExternal']! / workers) : 0.0;
         final individualInternal = workers > 0 ? (totals['collectiveInternal']! / workers) : 0.0;
-        final individualExtremity = workers > 0 ? (totals['totalExtremityDose']! / workers) : 0.0;
+        final individualExtremity = totals['individualExtremity']!;
         final individualTotal = individualExternal + individualInternal;
 
         totalCollectiveExternal += totals['collectiveExternal']!;
@@ -1532,7 +1532,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       final workers = t.workers;
       final indExternal = workers > 0 ? (totals['collectiveExternal']! / workers) : 0.0;
       final indInternal = workers > 0 ? (totals['collectiveInternal']! / workers) : 0.0;
-      final indExtremity = workers > 0 ? (totals['totalExtremityDose']! / workers) : 0.0;
+      final indExtremity = totals['individualExtremity']!;
       final indTotal = indExternal + indInternal;
 
       return Card(
@@ -3092,7 +3092,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Individual Extremity', style: TextStyle(fontSize: 12, color: Colors.black54)),
                     const SizedBox(height: 6),
-                    Text(totals['totalExtremityDose']!.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
+                    Text(totals['individualExtremity']!.toStringAsFixed(2), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.deepOrange)),
                     const SizedBox(height: 4),
                     Text('(mrem per person)', style: TextStyle(fontSize: 11, color: Colors.black45)),
                   ]),
