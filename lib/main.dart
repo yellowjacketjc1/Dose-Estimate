@@ -2967,33 +2967,33 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Show DAC input field when "Other" is selected
-                        if (n.name == 'Other') ...[
-                          Expanded(child: TextField(
-                            decoration: InputDecoration(
-                              labelText: 'DAC (µCi/mL)',
-                              hintText: 'Required for Other',
-                              filled: true,
-                              fillColor: Colors.orange.shade50,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.orange.shade300),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide(color: Colors.orange.shade300),
-                              ),
+                        // Always show DAC field - editable for "Other", read-only for others
+                        Expanded(child: TextField(
+                          decoration: InputDecoration(
+                            labelText: 'DAC (µCi/mL)',
+                            hintText: n.name == 'Other' ? 'Enter custom DAC' : '',
+                            filled: true,
+                            fillColor: n.name == 'Other' ? Colors.orange.shade50 : Colors.grey.shade100,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: n.name == 'Other' ? Colors.orange.shade300 : Colors.grey.shade300),
                             ),
-                            controller: n.dacController,
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            inputFormatters: [
-                              // allow digits, decimal point, exponent notation (e/E) and signs
-                              FilteringTextInputFormatter.allow(RegExp(r'[0-9eE+\-\.]')),
-                            ],
-                            onChanged: (v) { setState(() {}); },
-                          )),
-                          const SizedBox(width: 8),
-                        ],
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(color: n.name == 'Other' ? Colors.orange.shade300 : Colors.grey.shade300),
+                            ),
+                          ),
+                          controller: n.name == 'Other' ? n.dacController : TextEditingController(text: formatNumber(dac)),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          inputFormatters: [
+                            // allow digits, decimal point, exponent notation (e/E) and signs
+                            FilteringTextInputFormatter.allow(RegExp(r'[0-9eE+\-\.]')),
+                          ],
+                          readOnly: n.name != 'Other',
+                          enabled: n.name == 'Other',
+                          onChanged: (v) { setState(() {}); },
+                        )),
+                        const SizedBox(width: 8),
                         Expanded(child: TextField(
                           decoration: const InputDecoration(labelText: 'Contam. (dpm/100cm²)', hintText: 'enter contamination level here'),
                           controller: n.contamController,
