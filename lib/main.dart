@@ -67,6 +67,9 @@ class TaskData {
   List<NuclideEntry> nuclides;
   List<ExtremityEntry> extremities;
 
+  // Track expansion state for each section
+  Map<String, bool> sectionExpansionStates;
+
   // Persistent controllers so cursor/selection behavior remains stable
   final TextEditingController titleController = TextEditingController();
   final FocusNode titleFocusNode = FocusNode();
@@ -94,8 +97,17 @@ class TaskData {
     this.pfe = 1.0,
     List<NuclideEntry>? nuclides,
     List<ExtremityEntry>? extremities,
+    Map<String, bool>? sectionExpansionStates,
   })  : nuclides = nuclides ?? [NuclideEntry()],
-        extremities = extremities ?? [] {
+        extremities = extremities ?? [],
+        sectionExpansionStates = sectionExpansionStates ?? {
+          'timeEstimation': true,
+          'mpifCalculation': false,
+          'externalDose': false,
+          'extremityDose': false,
+          'protectionFactors': false,
+          'internalDose': false,
+        } {
   titleController.text = title;
   locationController.text = location;
   workersController.text = workers.toString();
@@ -166,6 +178,7 @@ class TaskData {
         'pfe': pfe,
         'nuclides': nuclides.map((n) => n.toJson()).toList(),
         'extremities': extremities.map((e) => e.toJson()).toList(),
+        'sectionExpansionStates': sectionExpansionStates,
       };
 
   static TaskData fromJson(Map<String, dynamic> j) {
@@ -184,6 +197,9 @@ class TaskData {
       pfe: (j['pfe'] ?? 1).toDouble(),
       nuclides: (j['nuclides'] as List? ?? []).map((e) => NuclideEntry.fromJson(e)).toList(),
       extremities: (j['extremities'] as List? ?? []).map((e) => ExtremityEntry.fromJson(e)).toList(),
+      sectionExpansionStates: j['sectionExpansionStates'] != null
+        ? Map<String, bool>.from(j['sectionExpansionStates'])
+        : null,
     );
   }
 }
@@ -390,6 +406,11 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
   Map<String, bool> triggerOverrides = {};
   // justifications for overrides
   Map<String, String> overrideJustifications = {};
+
+  // Track expansion state for summary page sections
+  Map<String, bool> summaryExpansionStates = {
+    'internalDose': false,
+  };
 
   late TabController tabController;
 
@@ -2472,7 +2493,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
 
           // Time Estimation
           Card(
-            child: ExpansionTile(title: const Text('Time Estimation'), initiallyExpanded: true, children: [
+            child: ExpansionTile(
+              title: const Text('Time Estimation'),
+              initiallyExpanded: t.sectionExpansionStates['timeEstimation'] ?? true,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['timeEstimation'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(children: [
@@ -2540,7 +2569,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
           const SizedBox(height: 12),
 
           Card(
-            child: ExpansionTile(title: const Text('mPIF Calculation'), children: [
+            child: ExpansionTile(
+              title: const Text('mPIF Calculation'),
+              initiallyExpanded: t.sectionExpansionStates['mpifCalculation'] ?? false,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['mpifCalculation'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(children: [
@@ -2704,7 +2741,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
           const SizedBox(height: 12),
 
           Card(
-            child: ExpansionTile(title: const Text('External Dose Estimate'), children: [
+            child: ExpansionTile(
+              title: const Text('External Dose Estimate'),
+              initiallyExpanded: t.sectionExpansionStates['externalDose'] ?? false,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['externalDose'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(children: [
@@ -2774,7 +2819,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
           const SizedBox(height: 12),
 
           Card(
-            child: ExpansionTile(title: const Text('Extremity/Skin Dose Estimate'), children: [
+            child: ExpansionTile(
+              title: const Text('Extremity/Skin Dose Estimate'),
+              initiallyExpanded: t.sectionExpansionStates['extremityDose'] ?? false,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['extremityDose'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(children: [
@@ -2916,7 +2969,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
           const SizedBox(height: 12),
 
           Card(
-            child: ExpansionTile(title: const Text('Protection Factors'), children: [
+            child: ExpansionTile(
+              title: const Text('Protection Factors'),
+              initiallyExpanded: t.sectionExpansionStates['protectionFactors'] ?? false,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['protectionFactors'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Row(children: [
@@ -2943,7 +3004,15 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
           const SizedBox(height: 12),
 
           Card(
-            child: ExpansionTile(title: const Text('Internal Dose Calculation'), children: [
+            child: ExpansionTile(
+              title: const Text('Internal Dose Calculation'),
+              initiallyExpanded: t.sectionExpansionStates['internalDose'] ?? false,
+              onExpansionChanged: (expanded) {
+                setState(() {
+                  t.sectionExpansionStates['internalDose'] = expanded;
+                });
+              },
+              children: [
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(children: [
