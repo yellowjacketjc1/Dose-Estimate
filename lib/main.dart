@@ -563,6 +563,44 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     return dacValues[n.name] ?? 1e-12;
   }
 
+  // Get Appendix D base contamination level (dpm/100cm²) for removable contamination trigger
+  // Returns the base level that gets multiplied by 1000 for the ALARA trigger
+  double getAppendixDBaseLevel(NuclideEntry n) {
+    final name = n.name.toUpperCase();
+
+    // U-nat, U-235, U-238, and associated decay products
+    if (name.contains('U-NAT') || name == 'U-235' || name == 'U-238' ||
+        name.startsWith('U-') && (name.contains('235') || name.contains('238') || name.contains('NAT'))) {
+      return 1000.0;
+    }
+
+    // Transuranics: Ra-226, Ra-228, Th-230, Th-228, Pa-231, Ac-227, I-125, I-129
+    if (name == 'RA-226' || name == 'RA-228' || name == 'TH-230' || name == 'TH-228' ||
+        name == 'PA-231' || name == 'AC-227' || name == 'I-125' || name == 'I-129' ||
+        name.startsWith('PU-') || name.startsWith('AM-') || name.startsWith('CM-') ||
+        name.startsWith('NP-') || name.startsWith('BK-') || name.startsWith('CF-')) {
+      return 20.0;
+    }
+
+    // Th-nat, Th-232, Sr-90, Ra-223, Ra-224, U-232, I-126, I-131, I-133
+    if (name.contains('TH-NAT') || name == 'TH-232' || name == 'SR-90' ||
+        name == 'RA-223' || name == 'RA-224' || name == 'U-232' ||
+        name == 'I-126' || name == 'I-131' || name == 'I-133' ||
+        name.startsWith('TH-') && (name.contains('232') || name.contains('NAT'))) {
+      return 200.0;
+    }
+
+    // Tritium and STCs (Special Tritium Compounds)
+    if (name == 'H-3' || name == 'TRITIUM' || name.contains('TRITIUM')) {
+      return 10000.0;
+    }
+
+    // Beta-gamma emitters (default category for most nuclides)
+    // This includes all nuclides with decay modes other than alpha emission or spontaneous fission
+    // except Sr-90 and others noted above
+    return 1000.0;
+  }
+
   // Compute per-nuclide dose components in one place to keep UI and totals consistent.
   Map<String, double> computeNuclideDose(NuclideEntry n, TaskData t) {
     final dac = getDAC(n);
@@ -631,7 +669,10 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
         taskDacWithResp += dacFractionWithBoth;
         taskDacEngOnly += dacFractionEngOnly;
 
-        maxContamination = maxContamination > (contam / 1000) ? maxContamination : (contam / 1000);
+        // Calculate contamination ratio using radionuclide-specific Appendix D base level
+        final appendixDBase = getAppendixDBaseLevel(n);
+        final contamRatio = contam / (appendixDBase * 1000);
+        maxContamination = maxContamination > contamRatio ? maxContamination : contamRatio;
         maxDacSpikeEngOnly = maxDacSpikeEngOnly > taskDacEngOnly ? maxDacSpikeEngOnly : taskDacEngOnly;
       }
 
@@ -877,7 +918,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       if (t.workers > 0 && (totals['totalExtremityDose'] ?? 0) / t.workers > 5000) reasons['alara3'] = 'Task ${i + 1} extremity > 5000 mrem';
       if ((totals['collectiveEffective'] ?? 0) > 750) reasons['alara4'] = 'Task ${i + 1} collective > 750 mrem';
       if (taskDacEngOnly * t.hours > 200) reasons['alara5'] = 'Task ${i + 1} DAC-hrs eng-only > 200';
-      if (t.nuclides.any((n) => n.contam / 1000 > 1)) reasons['alara6'] = 'Task ${i + 1} contamination > 1000x Appendix D';
+      if (t.nuclides.any((n) => n.contam / (getAppendixDBaseLevel(n) * 1000) > 1)) reasons['alara6'] = 'Task ${i + 1} contamination > 1000x Appendix D';
       if (t.workers > 0 && (totals['collectiveInternal'] ?? 0) / t.workers > 100) reasons['alara7'] = 'Task ${i + 1} internal > 100 mrem';
       if (t.doseRate > 10000) reasons['alara8'] = 'Task ${i + 1} dose rate > 10 rem/hr';
     }
