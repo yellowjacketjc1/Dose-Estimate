@@ -1112,7 +1112,6 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                       ),
                       pw.SizedBox(height: 10),
                       pw.Text('Work Order: ${workOrderController.text}', style: const pw.TextStyle(fontSize: 12)),
-                      pw.Text('Date: ${dateController.text}', style: const pw.TextStyle(fontSize: 12)),
                       if (descriptionController.text.isNotEmpty)
                         pw.Text('Description: ${descriptionController.text}', style: const pw.TextStyle(fontSize: 12)),
                     ],
@@ -1283,6 +1282,104 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                       );
                     }).toList(),
                   ],
+                ),
+
+                // Signature lines
+                pw.SizedBox(height: 30),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.grey400),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Signatures', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+                      pw.SizedBox(height: 16),
+
+                      // Preparer signature line (always shown)
+                      pw.Row(
+                        children: [
+                          pw.Expanded(
+                            flex: 2,
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text('Preparer:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                                pw.SizedBox(height: 8),
+                                pw.Container(
+                                  decoration: const pw.BoxDecoration(
+                                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black)),
+                                  ),
+                                  height: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                          pw.SizedBox(width: 20),
+                          pw.Expanded(
+                            flex: 1,
+                            child: pw.Column(
+                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              children: [
+                                pw.Text('Date:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                                pw.SizedBox(height: 8),
+                                pw.Container(
+                                  decoration: const pw.BoxDecoration(
+                                    border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black)),
+                                  ),
+                                  height: 20,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Peer check signature line (only if ALARA review required)
+                      if (finalTriggers['alaraReview'] == true) ...[
+                        pw.SizedBox(height: 20),
+                        pw.Row(
+                          children: [
+                            pw.Expanded(
+                              flex: 2,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text('Peer Check (ALARA Review):', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                                  pw.SizedBox(height: 8),
+                                  pw.Container(
+                                    decoration: const pw.BoxDecoration(
+                                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black)),
+                                    ),
+                                    height: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            pw.SizedBox(width: 20),
+                            pw.Expanded(
+                              flex: 1,
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text('Date:', style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                                  pw.SizedBox(height: 8),
+                                  pw.Container(
+                                    decoration: const pw.BoxDecoration(
+                                      border: pw.Border(bottom: pw.BorderSide(color: PdfColors.black)),
+                                    ),
+                                    height: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             );
@@ -2072,7 +2169,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                   TextField(
                     controller: workOrderController,
                     decoration: InputDecoration(
-                      labelText: 'Work Control Document Number',
+                      labelText: 'RWP (Radiological Work Permit) Number',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -2085,38 +2182,6 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                       ),
                     ),
                     style: TextStyle(color: Colors.blueGrey.shade700),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: dateController,
-                    decoration: InputDecoration(
-                      labelText: 'Date',
-                      suffixIcon: Icon(Icons.calendar_today, color: Colors.blueGrey.shade600),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.blueGrey.shade300),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.blueGrey.shade300),
-                      ),
-                    ),
-                    readOnly: true,
-                    style: TextStyle(color: Colors.blueGrey.shade700),
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: DateTime.tryParse(dateController.text) ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        dateController.text = '${picked.year.toString().padLeft(4, '0')}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-                        setState(() {});
-                      }
-                    },
                   ),
                   const SizedBox(height: 12),
                   TextField(
