@@ -205,13 +205,13 @@ class TaskData {
 }
 
 class NuclideEntry {
-  String name;
+  String? name;
   double contam; // dpm/100cm2
   double? customDAC; // µCi/mL - only used when name is "Other"
   final TextEditingController contamController = TextEditingController();
   final TextEditingController dacController = TextEditingController();
 
-  NuclideEntry({this.name = 'Other', this.contam = 0.0, this.customDAC}) {
+  NuclideEntry({this.name, this.contam = 0.0, this.customDAC}) {
     contamController.text = contam.toString();
     contamController.addListener(() {
       final parsed = double.tryParse(contamController.text);
@@ -241,7 +241,7 @@ class NuclideEntry {
   };
 
   static NuclideEntry fromJson(Map<String, dynamic> j) => NuclideEntry(
-    name: j['name'] ?? 'Other',
+    name: j['name'],
     contam: (j['contam'] ?? 0).toDouble(),
     customDAC: j['customDAC']?.toDouble()
   );
@@ -523,8 +523,12 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       totalCollectiveInternalAfterPFE += nuclideDoseAfterPFE;
     }
 
-    final collectiveExternal = t.doseRate * personHours;
-    final collectiveEffective = collectiveExternal + totalCollectiveInternal;
+    // Apply 15% respirator penalty if using a respirator (pfr > 1)
+    final respiratorPenalty = t.pfr > 1.0 ? 1.15 : 1.0;
+
+    final collectiveExternal = t.doseRate * personHours * respiratorPenalty;
+    final collectiveInternalWithPenalty = totalCollectiveInternal * respiratorPenalty;
+    final collectiveEffective = collectiveExternal + collectiveInternalWithPenalty;
     final individualEffective = workers > 0 ? collectiveEffective / workers : 0.0;
 
     // Calculate extremity dose ONLY from manually entered extremity entries
@@ -547,12 +551,13 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       'totalDacFraction': totalDacFraction, // post-PFE (what the UI previously showed)
       'totalDacFractionEngOnly': totalDacFractionEngOnly,
       'totalDacFractionWithResp': totalDacFractionWithResp,
-  'collectiveInternal': totalCollectiveInternal,
+  'collectiveInternal': collectiveInternalWithPenalty,
   'collectiveInternalUnprotected': totalCollectiveInternalUnprotected,
   'collectiveInternalAfterPFE': totalCollectiveInternalAfterPFE,
       'collectiveExternal': collectiveExternal,
       'collectiveEffective': collectiveEffective,
       'individualEffective': individualEffective,
+      'respiratorPenalty': respiratorPenalty,
       // keep backwards compatibility: 'totalExtremityDose' represents the collective extremity
       // so that callers dividing by workers obtain the per-person dose as before.
       'totalExtremityDose': collectiveExtremity,
@@ -587,7 +592,8 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
   // Get Appendix D base contamination level (dpm/100cm²) for removable contamination trigger
   // Returns the base level that gets multiplied by 1000 for the ALARA trigger
   double getAppendixDBaseLevel(NuclideEntry n) {
-    final name = n.name.toUpperCase();
+    final name = n.name?.toUpperCase();
+    if (name == null) return 100.0; // Default if no nuclide selected
 
     // U-nat, U-235, U-238, and associated decay products
     if (name.contains('U-NAT') || name == 'U-235' || name == 'U-238' ||
@@ -1505,7 +1511,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                             children: [
                               pw.Padding(
                                 padding: const pw.EdgeInsets.all(4),
-                                child: pw.Text(n.name, style: const pw.TextStyle(fontSize: 9)),
+                                child: pw.Text(n.name ?? 'Not selected', style: const pw.TextStyle(fontSize: 9)),
                               ),
                               pw.Padding(
                                 padding: const pw.EdgeInsets.all(4),
@@ -1605,6 +1611,21 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                         pw.Text('  Internal: ${formatNumber(totals['collectiveInternal']!)} person-mrem', style: const pw.TextStyle(fontSize: 9)),
                         pw.Text('  Total Effective: ${totals['collectiveEffective']!.toStringAsFixed(2)} person-mrem',
                             style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+                        if (totals['respiratorPenalty']! > 1.0) ...[
+                          pw.SizedBox(height: 6),
+                          pw.Container(
+                            padding: const pw.EdgeInsets.all(6),
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.amber50,
+                              border: pw.Border.all(color: PdfColors.amber300),
+                              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                            ),
+                            child: pw.Text(
+                              'Note: Doses include 15% respirator penalty (×1.15)',
+                              style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -2797,7 +2818,33 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                         ),
                       ),
                     ))
-                  ])
+                  ]),
+                  const SizedBox(height: 12),
+                  // Reference note for mPIF factors
+                  Container(
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Refer to Attachment A of HPP 9.1 for details on mPIF factors',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.blue.shade900,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ]),
               )
             ]),
@@ -2902,8 +2949,10 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                         Expanded(
                           child: Autocomplete<String>(
                             optionsBuilder: (TextEditingValue textEditingValue) {
-                              if (textEditingValue.text == '') return dacValues.keys.toList();
-                              return dacValues.keys.where((k) => k.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                              // Add "Other" and "Various" options along with dacValues
+                              final allOptions = ['Other', 'Various', ...dacValues.keys];
+                              if (textEditingValue.text == '') return allOptions;
+                              return allOptions.where((k) => k.toLowerCase().contains(textEditingValue.text.toLowerCase()));
                             },
                             optionsViewBuilder: (context, onSelected, options) {
                               return Material(
@@ -3157,11 +3206,11 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Always show DAC field - editable for "Other", read-only for others
+                        // Always show DAC field - editable for "Other", read-only for others, empty when no nuclide selected
                         Expanded(child: TextField(
                           decoration: InputDecoration(
                             labelText: 'DAC (µCi/mL)',
-                            hintText: n.name == 'Other' ? 'Enter custom DAC' : '',
+                            hintText: n.name == 'Other' ? 'Enter custom DAC' : (n.name == null ? 'Select nuclide first' : ''),
                             filled: true,
                             fillColor: n.name == 'Other' ? Colors.orange.shade50 : Colors.grey.shade100,
                             border: OutlineInputBorder(
@@ -3173,7 +3222,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                               borderSide: BorderSide(color: n.name == 'Other' ? Colors.orange.shade300 : Colors.grey.shade300),
                             ),
                           ),
-                          controller: n.name == 'Other' ? n.dacController : TextEditingController(text: formatNumber(dac)),
+                          controller: n.name == 'Other' ? n.dacController : TextEditingController(text: n.name != null ? formatNumber(dac) : ''),
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           inputFormatters: [
                             // allow digits, decimal point, exponent notation (e/E) and signs
@@ -3324,6 +3373,35 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
               ),
             ),
           ]),
+
+          // Respirator penalty note
+          if (totals['respiratorPenalty']! > 1.0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dose values include 15% respirator penalty (×1.15) for external and internal doses',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber.shade900,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
