@@ -334,6 +334,9 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     "Al-26": 4e-8, // (F/M)
     "Am-241": 5e-12,
     "Am-243": 5e-12,
+    "Ar-37": 3.0, // (Immersion)
+    "Ar-39": 1e-3, // (Immersion)
+    "Ar-41": 3e-6, // (Immersion)
     "As-73": 8e-7,
     "As-74": 3e-7,
     "As-76": 6e-7,
@@ -465,6 +468,16 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     "K-40": 1e-7,
     "K-42": 2e-6,
     "K-43": 9e-7,
+    "Kr-74": 3e-6, // (Immersion)
+    "Kr-76": 1e-5, // (Immersion)
+    "Kr-77": 4e-6, // (Immersion)
+    "Kr-79": 2e-5, // (Immersion)
+    "Kr-81": 5e-4, // (Immersion)
+    "Kr-83m": 5e-2, // (Immersion)
+    "Kr-85": 5e-4, // (Immersion)
+    "Kr-85m": 3e-5, // (Immersion)
+    "Kr-87": 4e-6, // (Immersion)
+    "Kr-88": 2e-6, // (Immersion)
 
     // L
     "La-137": 4e-8, // (F)
@@ -686,6 +699,21 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     "W-187": 1e-6,
     "W-188": 6e-7,
 
+    // X
+    "Xe-120": 1e-5, // (Immersion)
+    "Xe-121": 2e-6, // (Immersion)
+    "Xe-122": 8e-5, // (Immersion)
+    "Xe-123": 6e-6, // (Immersion)
+    "Xe-125": 2e-5, // (Immersion)
+    "Xe-127": 1e-5, // (Immersion)
+    "Xe-129m": 2e-4, // (Immersion)
+    "Xe-131m": 3e-4, // (Immersion)
+    "Xe-133": 1e-4, // (Immersion)
+    "Xe-133m": 1e-4, // (Immersion)
+    "Xe-135": 2e-5, // (Immersion)
+    "Xe-135m": 1e-5, // (Immersion)
+    "Xe-138": 3e-6, // (Immersion)
+
     // Y
     "Y-86": 4e-7, // (M/S)
     "Y-87": 8e-7, // (S)
@@ -711,7 +739,8 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     "Zr-97": 4e-7, // (M/S)
 
     // Default
-    "Other": 2e-13 // (Alpha/SF Default)
+    "Other": 2e-13, // (Alpha/SF Default)
+    "Other_Noble_Gas_lt_2h": 1e-6 // (Default for unlisted noble gas <2h)
   };
 
   final Map<String, double> releaseFactors = const {
