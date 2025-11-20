@@ -418,4 +418,17 @@ class NuclideData {
     "Other": 2e-13, // (Alpha/SF Default)
     "Other_Noble_Gas_lt_2h": 1e-6 // (Default for unlisted noble gas <2h)
   };
+  static double getDac(String name) {
+    return dacValues[name] ?? 2e-13; // Default to Other if not found
+  }
+
+  static List<String> get nuclideNames => dacValues.keys.toList()..sort();
+
+  static List<String> get extremityNuclides => [
+    'Sr/Y-90',
+    'Cs-137',
+    'Co-60',
+    'U-nat',
+    'Other'
+  ];
 }

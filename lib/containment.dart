@@ -331,6 +331,10 @@ class _ContainmentTabState extends State<ContainmentTab> {
     final currentFr = double.tryParse(frController.text) ?? 0.0;
     final frError = selectedForm != null && (currentFr < selectedForm!.minFr || currentFr > selectedForm!.maxFr);
 
+    final theme = Theme.of(context);
+    final titleStyle = theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold, color: theme.colorScheme.primary);
+    final subTitleStyle = theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -338,20 +342,29 @@ class _ContainmentTabState extends State<ContainmentTab> {
         children: [
           // --- Master Confinement Selection ---
           Card(
-            elevation: 4,
-            color: Colors.blue.shade50,
+            elevation: 2,
+            color: Colors.purple.shade50,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.purple.shade100),
+            ),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('1. Select Confinement Type', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text('1. Select Confinement Type', style: titleStyle?.copyWith(color: Colors.purple.shade800)),
                   const SizedBox(height: 8),
-                  const Text('This selection determines the parameters for both Containment and Bioassay calculations.', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                  Text('This selection determines the parameters for both Containment and Bioassay calculations.', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.purple.shade900)),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<UnifiedConfinementType>(
                     value: selectedConfinement,
-                    decoration: const InputDecoration(labelText: 'Confinement Type', border: OutlineInputBorder(), filled: true, fillColor: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Confinement Type', 
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)), 
+                      filled: true, 
+                      fillColor: Colors.white
+                    ),
                     isExpanded: true,
                     items: confinementTypes.map((e) => DropdownMenuItem(value: e, child: Text(e.name, overflow: TextOverflow.ellipsis))).toList(),
                     onChanged: onConfinementChanged,
@@ -365,83 +378,113 @@ class _ContainmentTabState extends State<ContainmentTab> {
           // --- Source Term & Activity ---
           Card(
             elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('2. Source Term & Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
+                  Text('2. Source Term & Activity', style: titleStyle),
+                  const SizedBox(height: 20),
                   
                   // Activity Input
-                  Row(
-                    children: [
-                      const Text('Input Method:', style: TextStyle(fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 16),
-                      ToggleButtons(
-                        isSelected: [!useContaminationInput, useContaminationInput],
-                        onPressed: (index) {
-                          setState(() {
-                            useContaminationInput = index == 1;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        children: const [
-                          Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('Direct Activity')),
-                          Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('Contamination')),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  if (useContaminationInput) ...[
-                    Row(
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey.shade200),
+                    ),
+                    child: Column(
                       children: [
-                        Expanded(
-                          child: TextField(
-                            controller: contaminationController,
-                            decoration: const InputDecoration(labelText: 'Contamination (dpm/100cm²)', border: OutlineInputBorder()),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => calculateContamination(),
-                          ),
+                        Row(
+                          children: [
+                            const Text('Input Method:', style: TextStyle(fontWeight: FontWeight.w600)),
+                            const SizedBox(width: 16),
+                            ToggleButtons(
+                              isSelected: [!useContaminationInput, useContaminationInput],
+                              onPressed: (index) {
+                                setState(() {
+                                  useContaminationInput = index == 1;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(8),
+                              constraints: const BoxConstraints(minHeight: 36, minWidth: 100),
+                              children: const [
+                                Text('Direct Activity'),
+                                Text('Contamination'),
+                              ],
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: TextField(
-                            controller: areaController,
-                            decoration: const InputDecoration(labelText: 'Area (cm²)', border: OutlineInputBorder()),
-                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            onChanged: (_) => calculateContamination(),
+                        const SizedBox(height: 16),
+                        
+                        if (useContaminationInput) ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: contaminationController,
+                                  decoration: const InputDecoration(labelText: 'Contamination (dpm/100cm²)', border: OutlineInputBorder()),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => calculateContamination(),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: TextField(
+                                  controller: areaController,
+                                  decoration: const InputDecoration(labelText: 'Area (cm²)', border: OutlineInputBorder()),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  onChanged: (_) => calculateContamination(),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(4)),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                Text('Calculated Total Activity: ${totalActivityController.text} µCi', style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ] else ...[
+                          TextField(
+                            controller: totalActivityController,
+                            decoration: const InputDecoration(labelText: 'Total Activity (µCi)', border: OutlineInputBorder()),
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            onChanged: (_) => calculate(),
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text('Calculated Total Activity: ${totalActivityController.text} µCi', style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.bold)),
-                  ] else ...[
-                    TextField(
-                      controller: totalActivityController,
-                      decoration: const InputDecoration(labelText: 'Total Activity (µCi)', border: OutlineInputBorder()),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (_) => calculate(),
-                    ),
-                  ],
+                  ),
                   
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   
-                  // Source Term Table
+                  // Source Term Table Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Nuclides', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      TextButton.icon(
+                      Text('Nuclide Mixture', style: subTitleStyle),
+                      FilledButton.icon(
                         onPressed: addNuclideRow,
                         icon: const Icon(Icons.add),
                         label: const Text('Add Nuclide'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.teal,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
                   Table(
                     columnWidths: const {
                       0: FlexColumnWidth(2),
@@ -449,14 +492,15 @@ class _ContainmentTabState extends State<ContainmentTab> {
                       2: FlexColumnWidth(1),
                       3: FixedColumnWidth(48),
                     },
-                    border: TableBorder.all(color: Colors.grey.shade300),
+                    border: TableBorder.all(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(8)),
+                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                     children: [
                       TableRow(
                         decoration: BoxDecoration(color: Colors.grey.shade100),
                         children: const [
-                          Padding(padding: EdgeInsets.all(8.0), child: Text('Nuclide', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Padding(padding: EdgeInsets.all(8.0), child: Text('Fraction (0-1)', style: TextStyle(fontWeight: FontWeight.bold))),
-                          Padding(padding: EdgeInsets.all(8.0), child: Text('DAC (µCi/mL)', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Padding(padding: EdgeInsets.all(12.0), child: Text('Nuclide', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Padding(padding: EdgeInsets.all(12.0), child: Text('Fraction (0-1)', style: TextStyle(fontWeight: FontWeight.bold))),
+                          Padding(padding: EdgeInsets.all(12.0), child: Text('DAC (µCi/mL)', style: TextStyle(fontWeight: FontWeight.bold))),
                           SizedBox(),
                         ],
                       ),
@@ -467,7 +511,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
                           key: item.key,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.all(4.0),
+                              padding: const EdgeInsets.all(8.0),
                               child: LayoutBuilder(
                                 builder: (context, constraints) {
                                   return RawAutocomplete<String>(
@@ -496,7 +540,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
                                         controller: textEditingController,
                                         focusNode: focusNode,
                                         decoration: const InputDecoration(
-                                          contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12), 
+                                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12), 
                                           border: OutlineInputBorder(),
                                           hintText: 'Search...'
                                         ),
@@ -508,6 +552,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
                                         alignment: Alignment.topLeft,
                                         child: Material(
                                           elevation: 4.0,
+                                          borderRadius: BorderRadius.circular(8),
                                           child: SizedBox(
                                             width: constraints.maxWidth,
                                             height: 200,
@@ -533,16 +578,16 @@ class _ContainmentTabState extends State<ContainmentTab> {
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.all(4.0),
+                              padding: const EdgeInsets.all(8.0),
                               child: TextFormField(
                                 initialValue: item.fraction.toString(),
-                                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12), border: OutlineInputBorder()),
+                                decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12), border: OutlineInputBorder()),
                                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                 onChanged: (v) => updateFraction(index, v),
                               ),
                             ),
                             Padding(
-                              padding: const EdgeInsets.all(8.0),
+                              padding: const EdgeInsets.all(12.0),
                               child: Text(item.dac.toStringAsExponential(2), style: const TextStyle(fontSize: 13)),
                             ),
                             IconButton(
@@ -557,9 +602,15 @@ class _ContainmentTabState extends State<ContainmentTab> {
                   if (fractionError)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        'Warning: Fractions sum to ${totalFraction.toStringAsFixed(3)} (should be 1.0)',
-                        style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber, color: Colors.orange, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Warning: Fractions sum to ${totalFraction.toStringAsFixed(3)} (should be 1.0)',
+                            style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ),
                 ],
@@ -571,14 +622,14 @@ class _ContainmentTabState extends State<ContainmentTab> {
           // --- Containment Assessment ---
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.blue.shade200, width: 2), borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.blue.shade200, width: 2), borderRadius: BorderRadius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('3. Containment Assessment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue)),
-                  const SizedBox(height: 16),
+                  Text('3. Containment Assessment', style: titleStyle?.copyWith(color: Colors.blue.shade800)),
+                  const SizedBox(height: 20),
                   
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,12 +731,12 @@ class _ContainmentTabState extends State<ContainmentTab> {
                   ),
                   
                   if (calculatedResult != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: isSufficient! ? Colors.green.shade50 : Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: isSufficient! ? Colors.green : Colors.red),
                       ),
                       child: Column(
@@ -693,15 +744,16 @@ class _ContainmentTabState extends State<ContainmentTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(isSufficient! ? Icons.check_circle : Icons.warning, color: isSufficient! ? Colors.green : Colors.red),
-                              const SizedBox(width: 8),
+                              Icon(isSufficient! ? Icons.check_circle : Icons.warning, color: isSufficient! ? Colors.green : Colors.red, size: 28),
+                              const SizedBox(width: 12),
                               Text(
                                 isSufficient! ? 'Containment SUFFICIENT' : 'Containment NOT SUFFICIENT',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: isSufficient! ? Colors.green.shade800 : Colors.red.shade800),
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isSufficient! ? Colors.green.shade800 : Colors.red.shade800),
                               ),
                             ],
                           ),
-                          Text('Value: ${calculatedResult!.toStringAsExponential(3)} (Limit: 0.02)', style: TextStyle(color: isSufficient! ? Colors.green.shade800 : Colors.red.shade800)),
+                          const SizedBox(height: 8),
+                          Text('Value: ${calculatedResult!.toStringAsExponential(3)} (Limit: 0.02)', style: TextStyle(color: isSufficient! ? Colors.green.shade800 : Colors.red.shade800, fontSize: 16)),
                         ],
                       ),
                     ),
@@ -715,14 +767,14 @@ class _ContainmentTabState extends State<ContainmentTab> {
           // --- Bioassay Assessment ---
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.purple.shade200, width: 2), borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(side: BorderSide(color: Colors.purple.shade200, width: 2), borderRadius: BorderRadius.circular(12)),
             child: Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.all(20.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('4. Bioassay Assessment', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.purple)),
-                  const SizedBox(height: 16),
+                  Text('4. Bioassay Assessment', style: titleStyle?.copyWith(color: Colors.purple.shade800)),
+                  const SizedBox(height: 20),
                   
                   // Read-only Confinement Factor
                   TextFormField(
@@ -732,7 +784,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
                       labelText: 'Confinement Factor (C) - From Selection', 
                       border: OutlineInputBorder(),
                       filled: true,
-                      fillColor: Color(0xFFEEEEEE),
+                      fillColor: Color(0xFFF3E5F5), // Light purple tint
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -789,12 +841,12 @@ class _ContainmentTabState extends State<ContainmentTab> {
                   ),
                   
                   if (bioassayRequired != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: !bioassayRequired! ? Colors.green.shade50 : Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: !bioassayRequired! ? Colors.green : Colors.orange),
                       ),
                       child: Column(
@@ -802,15 +854,16 @@ class _ContainmentTabState extends State<ContainmentTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(!bioassayRequired! ? Icons.check_circle : Icons.warning_amber, color: !bioassayRequired! ? Colors.green : Colors.orange),
-                              const SizedBox(width: 8),
+                              Icon(!bioassayRequired! ? Icons.check_circle : Icons.warning_amber, color: !bioassayRequired! ? Colors.green : Colors.orange, size: 28),
+                              const SizedBox(width: 12),
                               Text(
                                 bioassayRequired! ? 'Routine Bioassay REQUIRED' : 'Routine Bioassay NOT Required',
-                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: !bioassayRequired! ? Colors.green.shade800 : Colors.orange.shade800),
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: !bioassayRequired! ? Colors.green.shade800 : Colors.orange.shade800),
                               ),
                             ],
                           ),
-                          Text('Threshold: ${bioassayThreshold!.toStringAsExponential(3)} µCi', style: TextStyle(color: Colors.grey.shade800)),
+                          const SizedBox(height: 8),
+                          Text('Threshold: ${bioassayThreshold!.toStringAsExponential(3)} µCi', style: TextStyle(color: Colors.grey.shade800, fontSize: 16)),
                         ],
                       ),
                     ),

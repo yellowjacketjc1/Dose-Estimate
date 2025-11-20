@@ -40,16 +40,154 @@ class DoseEstimateApp extends StatelessWidget {
           contentPadding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 12.0),
         ),
       ),
-      home: const DoseHomePage(),
+      home: const MainScreen(),
     );
   }
 }
 
-class DoseHomePage extends StatefulWidget {
-  const DoseHomePage({super.key});
+class MainScreen extends StatefulWidget {
+  const MainScreen({super.key});
 
   @override
-  State<DoseHomePage> createState() => _DoseHomePageState();
+  State<MainScreen> createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final GlobalKey<DoseEstimateScreenState> _doseEstimateKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+        setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('RPP-742 Task-Based Dose Assessment'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56.0),
+          child: Container(
+            color: const Color(0xFFF7F8FA), // Match page background
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.only(left: 16, top: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // Dose Estimate Tab
+                GestureDetector(
+                  onTap: () => _tabController.animateTo(0),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: _tabController.index == 0 ? Colors.white : const Color(0xFFE0E0E0),
+                        border: Border(
+                          top: BorderSide(
+                            color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : Colors.transparent,
+                            width: 4,
+                          ),
+                          left: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
+                          right: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
+                          bottom: BorderSide(
+                            color: _tabController.index == 0 ? Colors.white : const Color(0xFFCCCCCC),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        'DOSE ESTIMATE',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : const Color(0xFF757575),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                // Containment Analysis Tab
+                GestureDetector(
+                  onTap: () => _tabController.animateTo(1),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(10),
+                      topRight: Radius.circular(10),
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: _tabController.index == 1 ? Colors.white : const Color(0xFFE0E0E0),
+                        border: Border(
+                          top: BorderSide(
+                            color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : Colors.transparent,
+                            width: 4,
+                          ),
+                          left: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
+                          right: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
+                          bottom: BorderSide(
+                            color: _tabController.index == 1 ? Colors.white : const Color(0xFFCCCCCC),
+                            width: 1,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        'CONTAINMENT ANALYSIS',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : const Color(0xFF757575),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: _tabController.index == 0 ? [
+           IconButton(onPressed: () => _doseEstimateKey.currentState?.saveToFile(), icon: const Icon(Icons.save)),
+           IconButton(onPressed: () => _doseEstimateKey.currentState?.loadFromFile(), icon: const Icon(Icons.folder_open)),
+           IconButton(onPressed: () => _doseEstimateKey.currentState?.printSummaryReport(), icon: const Icon(Icons.print)),
+           IconButton(onPressed: () => _doseEstimateKey.currentState?.showDebugInfo(), icon: const Icon(Icons.bug_report)),
+        ] : [],
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          DoseEstimateScreen(key: _doseEstimateKey),
+          const ContainmentTab(),
+        ],
+      ),
+    );
+  }
+}
+
+class DoseEstimateScreen extends StatefulWidget {
+  const DoseEstimateScreen({super.key});
+
+  @override
+  State<DoseEstimateScreen> createState() => DoseEstimateScreenState();
 }
 
 class TaskData {
@@ -254,17 +392,21 @@ class NuclideEntry {
   }
 }
 
+
 class ExtremityEntry {
   String? nuclide;
   double doseRate;
   double time;
+  double contam;
   final TextEditingController doseRateController = TextEditingController();
   final TextEditingController timeController = TextEditingController();
+  final TextEditingController contamController = TextEditingController();
 
-  ExtremityEntry({this.nuclide, this.doseRate = 0.0, this.time = 0.0}) {
+  ExtremityEntry({this.nuclide, this.doseRate = 0.0, this.time = 0.0, this.contam = 0.0}) {
     // Initialize controllers with the current values
     doseRateController.text = doseRate.toString();
     timeController.text = time.toString();
+    contamController.text = contam.toString();
 
     // Keep model fields in sync with controllers
     doseRateController.addListener(() {
@@ -273,14 +415,23 @@ class ExtremityEntry {
     timeController.addListener(() {
       time = double.tryParse(timeController.text) ?? 0.0;
     });
+    contamController.addListener(() {
+      contam = double.tryParse(contamController.text) ?? 0.0;
+    });
   }
 
-  Map<String, dynamic> toJson() => {'nuclide': nuclide, 'doseRate': doseRate, 'time': time};
-  static ExtremityEntry fromJson(Map<String, dynamic> j) => ExtremityEntry(nuclide: j['nuclide'], doseRate: (j['doseRate'] ?? 0).toDouble(), time: (j['time'] ?? 0).toDouble());
+  Map<String, dynamic> toJson() => {'nuclide': nuclide, 'doseRate': doseRate, 'time': time, 'contam': contam};
+  static ExtremityEntry fromJson(Map<String, dynamic> j) => ExtremityEntry(
+    nuclide: j['nuclide'], 
+    doseRate: (j['doseRate'] ?? 0).toDouble(), 
+    time: (j['time'] ?? 0).toDouble(),
+    contam: (j['contam'] ?? 0).toDouble()
+  );
 
   void disposeControllers() {
     doseRateController.dispose();
     timeController.dispose();
+    contamController.dispose();
   }
 }
 
@@ -327,7 +478,7 @@ class _GradientPainter extends BoxPainter {
     canvas.drawRRect(rrect, fillPaint);
   }
 }
-class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMixin {
+class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProviderStateMixin {
   // dacValues moved to NuclideData class in nuclides.dart
 
   final Map<String, double> releaseFactors = const {
@@ -2066,11 +2217,36 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
     );
   }
 
+  void showDebugInfo() {
+    // Diagnostic dialog: show per-nuclide computed fields for the first task (or a sample)
+    final t = tasks.isNotEmpty ? tasks.first : TaskData(title: 'Sample', location: 'Lab', workers: 1, hours: 15.0, mpifR: 1.0, mpifC: 100.0, mpifD: 1.0, mpifS: 1.0, mpifU: 1.0, doseRate: 0.0, pfr: 1.0, pfe: 1.0, nuclides: [NuclideEntry(name: 'Sr-90', contam: 100000.0)]);
+    final List<Widget> rows = [];
+    rows.add(Text('Task: ${t.title}  Location: ${t.location}'));
+    rows.add(const SizedBox(height: 8));
+    for (final n in t.nuclides) {
+      final res = computeNuclideDose(n, t);
+      final dac = res['dac'] ?? 0.0;
+      final airConc = res['airConc'] ?? 0.0;
+      final raw = res['dacFractionRaw'] ?? 0.0;
+      final eng = res['dacFractionEngOnly'] ?? 0.0;
+      final collective = res['collective'] ?? 0.0;
+      final individual = res['individual'] ?? 0.0;
+      rows.add(Text('Nuclide: ${n.name}  Contam: ${n.contam} dpm/100cm²'));
+      rows.add(Text('  DAC: ${formatNumber(dac)}'));
+      rows.add(Text('  Air conc: ${airConc.toStringAsExponential(6)}'));
+      rows.add(Text('  DAC fraction (raw): ${raw.toStringAsExponential(6)}'));
+      rows.add(Text('  DAC fraction (after PFE): ${eng.toStringAsExponential(6)}'));
+      rows.add(Text('  Collective internal dose: ${collective.toStringAsExponential(6)}'));
+      rows.add(Text('  Individual internal dose: ${individual.toStringAsExponential(6)}'));
+      rows.add(const SizedBox(height: 6));
+    }
+    showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Per-nuclide Diagnostics'), content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: rows)), actions: [TextButton(onPressed: () { Navigator.of(ctx).pop(); }, child: const Text('Close'))]));
+  }
+
   @override
   Widget build(BuildContext context) {
     final tabs = <Tab>[const Tab(text: 'Summary')];
-    // Add Containment Tab
-    tabs.add(const Tab(text: 'Containment'));
+    // Containment tab removed
     
     tabs.addAll(List.generate(tasks.length, (i) {
       final td = tasks[i];
@@ -2079,41 +2255,9 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
       return Tab(key: ValueKey('task-tab-$i'), text: label);
     }));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('RPP-742 Task-Based Dose Assessment'),
-        actions: [
-          IconButton(onPressed: saveToFile, icon: const Icon(Icons.save)),
-          IconButton(onPressed: loadFromFile, icon: const Icon(Icons.folder_open)),
-          IconButton(onPressed: printSummaryReport, icon: const Icon(Icons.print)),
-          IconButton(onPressed: () {
-            // Diagnostic dialog: show per-nuclide computed fields for the first task (or a sample)
-            final t = tasks.isNotEmpty ? tasks.first : TaskData(title: 'Sample', location: 'Lab', workers: 1, hours: 15.0, mpifR: 1.0, mpifC: 100.0, mpifD: 1.0, mpifS: 1.0, mpifU: 1.0, doseRate: 0.0, pfr: 1.0, pfe: 1.0, nuclides: [NuclideEntry(name: 'Sr-90', contam: 100000.0)]);
-            final List<Widget> rows = [];
-            rows.add(Text('Task: ${t.title}  Location: ${t.location}'));
-            rows.add(const SizedBox(height: 8));
-            for (final n in t.nuclides) {
-              final res = computeNuclideDose(n, t);
-              final dac = res['dac'] ?? 0.0;
-              final airConc = res['airConc'] ?? 0.0;
-              final raw = res['dacFractionRaw'] ?? 0.0;
-              final eng = res['dacFractionEngOnly'] ?? 0.0;
-              final collective = res['collective'] ?? 0.0;
-              final individual = res['individual'] ?? 0.0;
-              rows.add(Text('Nuclide: ${n.name}  Contam: ${n.contam} dpm/100cm²'));
-              rows.add(Text('  DAC: ${formatNumber(dac)}'));
-              rows.add(Text('  Air conc: ${airConc.toStringAsExponential(6)}'));
-              rows.add(Text('  DAC fraction (raw): ${raw.toStringAsExponential(6)}'));
-              rows.add(Text('  DAC fraction (after PFE): ${eng.toStringAsExponential(6)}'));
-              rows.add(Text('  Collective internal dose: ${collective.toStringAsExponential(6)}'));
-              rows.add(Text('  Individual internal dose: ${individual.toStringAsExponential(6)}'));
-              rows.add(const SizedBox(height: 6));
-            }
-            showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Per-nuclide Diagnostics'), content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: rows)), actions: [TextButton(onPressed: () { Navigator.of(ctx).pop(); }, child: const Text('Close'))]));
-          }, icon: const Icon(Icons.bug_report)),
-        ],
-      ),
-      body: SingleChildScrollView(
+    return Container(
+      color: Colors.grey[50],
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2218,44 +2362,50 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                             child: Stack(
                               children: [
                                 // Animated pill indicator
-                                AnimatedBuilder(
-                                  animation: tabController,
-                                  builder: (context, child) {
-                                    final selectedIndex = tabController.index;
-                                    const tabWidth = 160.0; // Fixed width for consistent sliding
-                                    const tabSpacing = 4.0;
+                                  AnimatedBuilder(
+                                    animation: tabController,
+                                    builder: (context, child) {
+                                      final selectedIndex = tabController.index;
+                                      const tabWidth = 160.0; // Fixed width for consistent sliding
+                                      const tabSpacing = 4.0;
 
-                                    return AnimatedPositioned(
-                                      duration: const Duration(milliseconds: 300),
-                                      curve: Curves.easeInOut,
-                                      left: selectedIndex * (tabWidth + tabSpacing),
-                                      child: Container(
-                                        width: tabWidth,
-                                        height: 40,
-                                        decoration: BoxDecoration(
-                                          // Translucent glassy effect
-                                          color: selectedIndex == 0
-                                            ? Colors.indigo.shade200.withOpacity(0.4)
-                                            : Colors.blue.shade200.withOpacity(0.4),
-                                          borderRadius: BorderRadius.circular(8),
-                                          border: Border.all(
-                                            color: selectedIndex == 0
-                                              ? Colors.indigo.shade300.withOpacity(0.6)
-                                              : Colors.blue.shade300.withOpacity(0.6),
-                                            width: 1.5,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: (selectedIndex == 0 ? Colors.indigo : Colors.blue).withOpacity(0.15),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 1),
+                                      // Determine color based on index
+                                      Color baseColor;
+                                      if (selectedIndex == 0) {
+                                        baseColor = Colors.indigo; // Summary
+                                      } else if (selectedIndex == 1) {
+                                        baseColor = Colors.purple; // Containment (Stand out!)
+                                      } else {
+                                        baseColor = Colors.blue; // Tasks
+                                      }
+
+                                      return AnimatedPositioned(
+                                        duration: const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                        left: selectedIndex * (tabWidth + tabSpacing),
+                                        child: Container(
+                                          width: tabWidth,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            // Translucent glassy effect
+                                            color: baseColor.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(
+                                              color: baseColor.withOpacity(0.6),
+                                              width: 1.5,
                                             ),
-                                          ],
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: baseColor.withOpacity(0.15),
+                                                blurRadius: 6,
+                                                offset: const Offset(0, 1),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    );
-                                  },
-                                ),
+                                      );
+                                    },
+                                  ),
                                 // Tab buttons on top of the slider
                                 Row(
                                   children: List.generate(tabs.length, (index) {
@@ -2281,7 +2431,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                                                 style: TextStyle(
                                                   fontWeight: FontWeight.w700,
                                                   color: isSelected
-                                                    ? (index == 0 ? Colors.indigo.shade800 : Colors.blue.shade800)
+                                                    ? (index == 0 ? Colors.indigo.shade800 : (index == 1 ? Colors.purple.shade800 : Colors.blue.shade800))
                                                     : Colors.grey.shade700,
                                                   fontSize: 13,
                                                 ),
@@ -2357,8 +2507,7 @@ class _DoseHomePageState extends State<DoseHomePage> with TickerProviderStateMix
                         padding: const EdgeInsets.all(16.0),
                         child: buildSummary(),
                       ),
-                      // Containment Tab
-                      const ContainmentTab(),
+                      // Containment Tab REMOVED
                       // Task Tabs
                       ...List.generate(tasks.length, (i) => buildTaskTab(i)),
                     ],
