@@ -111,7 +111,10 @@ class ContainmentTab extends StatefulWidget {
   State<ContainmentTab> createState() => _ContainmentTabState();
 }
 
-class _ContainmentTabState extends State<ContainmentTab> {
+class _ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  
   // Controllers
   final TextEditingController totalActivityController = TextEditingController();
   final TextEditingController volumeController = TextEditingController(text: '2.0E8');
@@ -158,6 +161,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
     faController.text = selectedConfinement!.defaultFa.toString();
     frController.text = selectedForm!.defaultFr.toString();
     
+    // Add initial row with empty search placeholder
     addNuclideRow();
   }
 
@@ -179,11 +183,11 @@ class _ContainmentTabState extends State<ContainmentTab> {
 
   void addNuclideRow() {
     setState(() {
-      final defaultName = NuclideData.dacValues.keys.first;
+      // Start with empty name so placeholder shows
       sourceTerm.add(NuclideMixEntry(
-        name: defaultName, 
+        name: '', 
         fraction: 0.0, 
-        dac: NuclideData.dacValues[defaultName] ?? 0.0
+        dac: 0.0
       ));
     });
     calculate();
@@ -322,6 +326,8 @@ class _ContainmentTabState extends State<ContainmentTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     double totalFraction = sourceTerm.fold(0.0, (sum, e) => sum + e.fraction);
     bool fractionError = (totalFraction - 1.0).abs() > 0.001;
     
@@ -542,7 +548,7 @@ class _ContainmentTabState extends State<ContainmentTab> {
                                         decoration: const InputDecoration(
                                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12), 
                                           border: OutlineInputBorder(),
-                                          hintText: 'Search...'
+                                          hintText: 'Search for radionuclide'
                                         ),
                                         onFieldSubmitted: (_) => onFieldSubmitted(),
                                       );

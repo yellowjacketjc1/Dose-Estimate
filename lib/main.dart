@@ -81,43 +81,52 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
           child: Container(
             color: const Color(0xFFF7F8FA), // Match page background
             alignment: Alignment.centerLeft,
-            padding: const EdgeInsets.only(left: 16, top: 8),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 // Dose Estimate Tab
-                GestureDetector(
-                  onTap: () => _tabController.animateTo(0),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(10),
-                      topRight: Radius.circular(10),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: _tabController.index == 0 ? Colors.white : const Color(0xFFE0E0E0),
-                        border: Border(
-                          top: BorderSide(
-                            color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : Colors.transparent,
-                            width: 4,
-                          ),
-                          left: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
-                          right: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
-                          bottom: BorderSide(
-                            color: _tabController.index == 0 ? Colors.white : const Color(0xFFCCCCCC),
-                            width: 1,
-                          ),
-                        ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(0),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        topRight: Radius.circular(10),
                       ),
-                      child: Text(
-                        'DOSE ESTIMATE',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : const Color(0xFF757575),
-                          letterSpacing: 0.5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 0 ? Colors.white : const Color(0xFFCFD8DC),
+                          border: Border(
+                            top: BorderSide(
+                              color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : Colors.transparent,
+                              width: _tabController.index == 0 ? 5 : 0,
+                            ),
+                            left: BorderSide(color: _tabController.index == 0 ? const Color(0xFFCCCCCC) : const Color(0xFFB0BEC5), width: 1),
+                            right: BorderSide(color: _tabController.index == 0 ? const Color(0xFFCCCCCC) : const Color(0xFFB0BEC5), width: 1),
+                            bottom: BorderSide(
+                              color: _tabController.index == 0 ? Colors.white : const Color(0xFFB0BEC5),
+                              width: 1,
+                            ),
+                          ),
+                          boxShadow: _tabController.index == 0 ? [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ] : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            'DOSE ESTIMATE',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: _tabController.index == 0 ? const Color(0xFF2DB7A3) : const Color(0xFF546E7A),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -125,37 +134,48 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
                 ),
                 const SizedBox(width: 4),
                 // Containment Analysis Tab
-                GestureDetector(
-                  onTap: () => _tabController.animateTo(1),
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(10),
-                      topRight: Radius.circular(10),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: _tabController.index == 1 ? Colors.white : const Color(0xFFE0E0E0),
-                        border: Border(
-                          top: BorderSide(
-                            color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : Colors.transparent,
-                            width: 4,
-                          ),
-                          left: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
-                          right: const BorderSide(color: Color(0xFFCCCCCC), width: 1),
-                          bottom: BorderSide(
-                            color: _tabController.index == 1 ? Colors.white : const Color(0xFFCCCCCC),
-                            width: 1,
-                          ),
-                        ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => _tabController.animateTo(1),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        topRight: Radius.circular(10),
                       ),
-                      child: Text(
-                        'CONTAINMENT ANALYSIS',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : const Color(0xFF757575),
-                          letterSpacing: 0.5,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        decoration: BoxDecoration(
+                          color: _tabController.index == 1 ? Colors.white : const Color(0xFFCFD8DC),
+                          border: Border(
+                            top: BorderSide(
+                              color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : Colors.transparent,
+                              width: _tabController.index == 1 ? 5 : 0,
+                            ),
+                            left: BorderSide(color: _tabController.index == 1 ? const Color(0xFFCCCCCC) : const Color(0xFFB0BEC5), width: 1),
+                            right: BorderSide(color: _tabController.index == 1 ? const Color(0xFFCCCCCC) : const Color(0xFFB0BEC5), width: 1),
+                            bottom: BorderSide(
+                              color: _tabController.index == 1 ? Colors.white : const Color(0xFFB0BEC5),
+                              width: 1,
+                            ),
+                          ),
+                          boxShadow: _tabController.index == 1 ? [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ] : null,
+                        ),
+                        child: Center(
+                          child: Text(
+                            'CONTAINMENT ANALYSIS',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _tabController.index == 1 ? const Color(0xFF2DB7A3) : const Color(0xFF546E7A),
+                              letterSpacing: 0.5,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -478,7 +498,10 @@ class _GradientPainter extends BoxPainter {
     canvas.drawRRect(rrect, fillPaint);
   }
 }
-class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProviderStateMixin {
+class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+  
   // dacValues moved to NuclideData class in nuclides.dart
 
   final Map<String, double> releaseFactors = const {
@@ -2243,8 +2266,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
     showDialog(context: context, builder: (ctx) => AlertDialog(title: const Text('Per-nuclide Diagnostics'), content: SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: rows)), actions: [TextButton(onPressed: () { Navigator.of(ctx).pop(); }, child: const Text('Close'))]));
   }
 
+
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     final tabs = <Tab>[const Tab(text: 'Summary')];
     // Containment tab removed
     
