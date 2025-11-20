@@ -55,6 +55,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final GlobalKey<DoseEstimateScreenState> _doseEstimateKey = GlobalKey();
+  final GlobalKey<ContainmentTabState> _containmentKey = GlobalKey();
 
   @override
   void initState() {
@@ -190,13 +191,19 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
            IconButton(onPressed: () => _doseEstimateKey.currentState?.loadFromFile(), icon: const Icon(Icons.folder_open)),
            IconButton(onPressed: () => _doseEstimateKey.currentState?.printSummaryReport(), icon: const Icon(Icons.print)),
            IconButton(onPressed: () => _doseEstimateKey.currentState?.showDebugInfo(), icon: const Icon(Icons.bug_report)),
+        ] : _tabController.index == 1 ? [
+           IconButton(
+             onPressed: () => _containmentKey.currentState?.printContainmentReport(),
+             icon: const Icon(Icons.print),
+             tooltip: 'Print Containment Report',
+           ),
         ] : [],
       ),
       body: TabBarView(
         controller: _tabController,
         children: [
           DoseEstimateScreen(key: _doseEstimateKey),
-          const ContainmentTab(),
+          ContainmentTab(key: _containmentKey),
         ],
       ),
     );
@@ -539,8 +546,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
   @override
   void initState() {
     super.initState();
-    // Start with 2 tabs: Summary + Containment
-    tabController = TabController(length: 2, vsync: this);
+    // Start with 1 tab: Summary (Containment moved to main tabs)
+    tabController = TabController(length: 1, vsync: this);
     tasks = [];
   }
 
@@ -578,9 +585,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
       }
 
       tasks.add(data ?? TaskData());
-    // Update tab controller length: Summary + Containment + Tasks
-    tabController = TabController(length: tasks.length + 2, vsync: this);
-    tabController.index = tasks.length + 1; // switch to new task tab
+    // Update tab controller length: Summary + Tasks
+    tabController = TabController(length: tasks.length + 1, vsync: this);
+    tabController.index = tasks.length; // switch to new task tab
     });
     // Request focus on the new task title after frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1170,8 +1177,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
           // load trigger overrides if present
         triggerOverrides = Map<String, bool>.from(state['triggerOverrides'] ?? {});
         overrideJustifications = Map<String, String>.from(state['overrideJustifications'] ?? {});
-        // Update tab controller length: Summary + Containment + Tasks
-        tabController = TabController(length: tasks.length + 2, vsync: this);
+        // Update tab controller length: Summary + Tasks
+        tabController = TabController(length: tasks.length + 1, vsync: this);
       });
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File loaded successfully')));
       }

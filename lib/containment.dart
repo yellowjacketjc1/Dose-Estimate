@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 import 'nuclides.dart';
 
 // --- Unified Data Models ---
@@ -108,10 +111,10 @@ class ContainmentTab extends StatefulWidget {
   const ContainmentTab({super.key});
 
   @override
-  State<ContainmentTab> createState() => _ContainmentTabState();
+  State<ContainmentTab> createState() => ContainmentTabState();
 }
 
-class _ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAliveClientMixin {
+class ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   
@@ -321,6 +324,254 @@ class _ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAlive
         frController.text = v.defaultFr.toString();
       });
       calculate();
+    }
+  }
+
+  Future<void> printContainmentReport() async {
+    try {
+      final pdf = pw.Document();
+      final timestamp = DateTime.now().toIso8601String();
+      
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.letter,
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                // Header
+                pw.Container(
+                  padding: const pw.EdgeInsets.only(bottom: 20),
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(bottom: pw.BorderSide(width: 2)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Containment Analysis Report',
+                        style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.SizedBox(height: 8),
+                      pw.Text(
+                        'Generated: ${DateTime.now().toString().substring(0, 19)}',
+                        style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+                      ),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Section 1: Confinement Selection
+                pw.Text(
+                  '1. Confinement Type',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.purple50,
+                    border: pw.Border.all(color: PdfColors.purple200),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Text(
+                    selectedConfinement?.name ?? 'Not selected',
+                    style: const pw.TextStyle(fontSize: 11),
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+
+                // Section 2: Source Term
+                pw.Text(
+                  '2. Source Term & Activity',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text('Total Activity: ${totalActivityController.text} µCi', style: const pw.TextStyle(fontSize: 11)),
+                pw.SizedBox(height: 8),
+                
+                // Nuclide Mixture Table
+                pw.Table(
+                  border: pw.TableBorder.all(color: PdfColors.grey400),
+                  children: [
+                    // Header row
+                    pw.TableRow(
+                      decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text('Nuclide', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text('Fraction', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text('DAC (µCi/mL)', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                        ),
+                      ],
+                    ),
+                    // Data rows
+                    ...sourceTerm.map((entry) => pw.TableRow(
+                      children: [
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(entry.name.isEmpty ? 'Not specified' : entry.name, style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(entry.fraction.toStringAsFixed(4), style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                        pw.Padding(
+                          padding: const pw.EdgeInsets.all(6),
+                          child: pw.Text(entry.dac.toStringAsExponential(2), style: const pw.TextStyle(fontSize: 10)),
+                        ),
+                      ],
+                    )).toList(),
+                  ],
+                ),
+                pw.SizedBox(height: 20),
+
+                // Section 3: Containment Assessment
+                pw.Text(
+                  '3. Containment Assessment',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.blue800),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.blue200, width: 2),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Physical Form: ${selectedForm?.name ?? "Not selected"}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Release Fraction (fr): ${frController.text}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Escape Fraction (fa): ${faController.text}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Room Volume: ${volumeController.text} cm³', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Mixing Factor: ${mixingController.text}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Uncertainty: ${uncertaintyController.text}', style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 12),
+                
+                // Containment Result
+                if (calculatedResult != null) ...[
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: isSufficient! ? PdfColors.green50 : PdfColors.red50,
+                      border: pw.Border.all(
+                        color: isSufficient! ? PdfColors.green : PdfColors.red,
+                        width: 2,
+                      ),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text(
+                          isSufficient! ? 'CONTAINMENT SUFFICIENT ✓' : 'CONTAINMENT NOT SUFFICIENT ✗',
+                          style: pw.TextStyle(
+                            fontSize: 12,
+                            fontWeight: pw.FontWeight.bold,
+                            color: isSufficient! ? PdfColors.green900 : PdfColors.red900,
+                          ),
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          'Value: ${calculatedResult!.toStringAsExponential(3)} (Limit: 0.02)',
+                          style: const pw.TextStyle(fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                pw.SizedBox(height: 20),
+
+                // Section 4: Bioassay Assessment
+                pw.Text(
+                  '4. Bioassay Assessment',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.purple800),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Container(
+                  padding: const pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    border: pw.Border.all(color: PdfColors.purple200, width: 2),
+                    borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text('Release Factor (R): ${selectedPifRelease?.name ?? "Not selected"} (${selectedPifRelease?.value ?? 0})', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Confinement Factor (C): ${selectedConfinement?.pifC ?? 0}', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Dispersibility (D): ${selectedDispersibility?.name ?? "Not selected"} (${selectedDispersibility?.value ?? 0})', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Occupancy (O): ${selectedOccupancy?.name ?? "Not selected"} (${selectedOccupancy?.value ?? 0})', style: const pw.TextStyle(fontSize: 10)),
+                      pw.SizedBox(height: 4),
+                      pw.Text('Special Form (S): ${selectedSpecialForm?.name ?? "Not selected"} (${selectedSpecialForm?.value ?? 0})', style: const pw.TextStyle(fontSize: 10)),
+                    ],
+                  ),
+                ),
+                pw.SizedBox(height: 12),
+                
+                // Bioassay Results
+                if (pifResult != null && bioassayThreshold != null) ...[
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      border: pw.Border.all(color: PdfColors.grey400),
+                      borderRadius: const pw.BorderRadius.all(pw.Radius.circular(4)),
+                    ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('PIF: ${pifResult!.toStringAsExponential(3)}', style: const pw.TextStyle(fontSize: 10)),
+                        pw.SizedBox(height: 4),
+                        pw.Text('Bioassay Threshold: ${bioassayThreshold!.toStringAsExponential(3)} µCi', style: const pw.TextStyle(fontSize: 10)),
+                        pw.SizedBox(height: 8),
+                        pw.Text(
+                          bioassayRequired! ? 'BIOASSAY REQUIRED ✓' : 'BIOASSAY NOT REQUIRED',
+                          style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                            color: bioassayRequired! ? PdfColors.orange900 : PdfColors.green900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
+        ),
+      );
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'containment_analysis.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to generate PDF: $e')),
+        );
+      }
     }
   }
 
