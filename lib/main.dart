@@ -349,21 +349,24 @@ class TaskData {
       };
 
   static TaskData fromJson(Map<String, dynamic> j) {
+    final rawNuclides = (j['nuclides'] as List?)?.map((e) => NuclideEntry.fromJson(e)).toList();
+    final rawExtremities = (j['extremities'] as List?)?.map((e) => ExtremityEntry.fromJson(e)).toList();
     return TaskData(
       title: j['title'] ?? '',
       location: j['location'] ?? '',
       workers: j['workers'] ?? 1,
       hours: (j['hours'] ?? 1).toDouble(),
-      mpifR: (j['mpifR'] ?? 1).toDouble(),
-      mpifC: (j['mpifC'] ?? 100).toDouble(),
-      mpifD: (j['mpifD'] ?? 1).toDouble(),
-      mpifS: (j['mpifS'] ?? 1).toDouble(),
-      mpifU: (j['mpifU'] ?? 1).toDouble(),
+      // Use 0.0 when values are missing so mPIF remains "not set" until user selects factors.
+      mpifR: (j['mpifR'] ?? 0).toDouble(),
+      mpifC: (j['mpifC'] ?? 0).toDouble(),
+      mpifD: (j['mpifD'] ?? 0).toDouble(),
+      mpifS: (j['mpifS'] ?? 0).toDouble(),
+      mpifU: (j['mpifU'] ?? 0).toDouble(),
       doseRate: (j['doseRate'] ?? 0).toDouble(),
       pfr: (j['pfr'] ?? 1).toDouble(),
       pfe: (j['pfe'] ?? 1).toDouble(),
-      nuclides: (j['nuclides'] as List? ?? []).map((e) => NuclideEntry.fromJson(e)).toList(),
-      extremities: (j['extremities'] as List? ?? []).map((e) => ExtremityEntry.fromJson(e)).toList(),
+      nuclides: (rawNuclides == null || rawNuclides.isEmpty) ? null : rawNuclides,
+      extremities: rawExtremities ?? const <ExtremityEntry>[],
       sectionExpansionStates: j['sectionExpansionStates'] != null
         ? Map<String, bool>.from(j['sectionExpansionStates'])
         : null,
@@ -821,8 +824,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
         final dac = getDAC(n);
         final mPIF = computeMPIF(t);
         final airConc = (contam / 100) * mPIF * (1 / 100) * (1 / 2.22e6);
-        final dacFractionWithBoth = (airConc / dac) / (t.pfe * t.pfr);
-        final dacFractionEngOnly = (airConc / dac) / t.pfe;
+        // Guard against divide-by-zero even if invalid values slip in via import.
+        final safeDac = (dac == 0.0) ? 1e-12 : dac;
+        final safePfe = (t.pfe <= 0.0) ? 1.0 : t.pfe;
+        final safePfr = (t.pfr <= 0.0) ? 1.0 : t.pfr;
+        final dacFractionWithBoth = (airConc / safeDac) / (safePfe * safePfr);
+        final dacFractionEngOnly = (airConc / safeDac) / safePfe;
 
         taskDacWithResp += dacFractionWithBoth;
         taskDacEngOnly += dacFractionEngOnly;
@@ -1052,8 +1059,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
         final dac = getDAC(n);
         final mPIF = computeMPIF(t);
         final airConc = (contam / 100) * mPIF * (1 / 100) * (1 / 2.22e6);
-        final dacWithBoth = (airConc / dac) / (t.pfe * t.pfr);
-        final dacEngOnly = (airConc / dac) / t.pfe;
+        final safeDac = (dac == 0.0) ? 1e-12 : dac;
+        final safePfe = (t.pfe <= 0.0) ? 1.0 : t.pfe;
+        final safePfr = (t.pfr <= 0.0) ? 1.0 : t.pfr;
+        final dacWithBoth = (airConc / safeDac) / (safePfe * safePfr);
+        final dacEngOnly = (airConc / safeDac) / safePfe;
         taskDacWithResp += dacWithBoth;
         taskDacEngOnly += dacEngOnly;
       }
@@ -1082,6 +1092,76 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
     }
 
     return reasons;
+  }
+
+  static const Set<double> _allowedPfrValues = {1.0, 50.0, 1000.0};
+  static const Set<double> _allowedPfeValues = {1.0, 1000.0, 100000.0};
+  static const Set<double> _allowedMpifRValues = {0.0, 1.0, 0.1, 0.01, 0.001};
+  static const Set<double> _allowedMpifCValues = {0.0, 100.0, 10.0, 1.0, 0.1, 0.01};
+  static const Set<double> _allowedMpifSValues = {0.0, 0.1, 1.0};
+
+  bool _isAllowedDouble(double value, Set<double> allowed) {
+    const eps = 1e-9;
+    return allowed.any((v) => (value - v).abs() <= eps);
+  }
+
+  bool _isAllowedIntDouble(double value, {required int min, required int max, bool allowZero = true}) {
+    const eps = 1e-9;
+    if (allowZero && value.abs() <= eps) return true;
+    final rounded = value.roundToDouble();
+    if ((value - rounded).abs() > eps) return false;
+    final asInt = rounded.toInt();
+    return asInt >= min && asInt <= max;
+  }
+
+  String? _validateTaskForImport(TaskData t) {
+    if (t.workers < 0) return 'Workers must be ≥ 0 (got ${t.workers}).';
+    if (t.hours < 0) return 'Hours must be ≥ 0 (got ${t.hours}).';
+    if (t.doseRate < 0) return 'Dose rate must be ≥ 0 (got ${t.doseRate}).';
+
+    if (!_isAllowedDouble(t.pfr, _allowedPfrValues)) {
+      return 'PFR must be one of ${_allowedPfrValues.toList()..sort()} (got ${t.pfr}).';
+    }
+    if (!_isAllowedDouble(t.pfe, _allowedPfeValues)) {
+      return 'PFE must be one of ${_allowedPfeValues.toList()..sort()} (got ${t.pfe}).';
+    }
+
+    if (!_isAllowedDouble(t.mpifR, _allowedMpifRValues)) {
+      return 'mPIF Release Factor (R) must be one of ${_allowedMpifRValues.toList()..sort()} (got ${t.mpifR}).';
+    }
+    if (!_isAllowedDouble(t.mpifC, _allowedMpifCValues)) {
+      return 'mPIF Confinement Factor (C) must be one of ${_allowedMpifCValues.toList()..sort()} (got ${t.mpifC}).';
+    }
+    if (!_isAllowedIntDouble(t.mpifD, min: 1, max: 10, allowZero: true)) {
+      return 'mPIF Dispersibility (D) must be an integer 1–10 (or 0 for not set) (got ${t.mpifD}).';
+    }
+    if (!_isAllowedIntDouble(t.mpifU, min: 1, max: 10, allowZero: true)) {
+      return 'mPIF Uncertainty (U) must be an integer 1–10 (or 0 for not set) (got ${t.mpifU}).';
+    }
+    if (!_isAllowedDouble(t.mpifS, _allowedMpifSValues)) {
+      return 'mPIF Special Form (S) must be one of ${_allowedMpifSValues.toList()..sort()} (got ${t.mpifS}).';
+    }
+
+    for (final n in t.nuclides) {
+      if (n.contam < 0) return 'Contamination must be ≥ 0 (got ${n.contam}).';
+      if (n.name != null && !NuclideData.dacValues.containsKey(n.name)) {
+        return 'Nuclide "${n.name}" is not a supported selection.';
+      }
+      if (n.name == 'Other' && n.customDAC != null && n.customDAC! <= 0) {
+        return 'Custom DAC for "Other" must be > 0 when provided (got ${n.customDAC}).';
+      }
+    }
+
+    for (final e in t.extremities) {
+      if (e.doseRate < 0) return 'Extremity dose rate must be ≥ 0 (got ${e.doseRate}).';
+      if (e.time < 0) return 'Extremity time must be ≥ 0 (got ${e.time}).';
+      if (e.contam < 0) return 'Extremity contamination must be ≥ 0 (got ${e.contam}).';
+      if (e.nuclide != null && !NuclideData.extremityNuclides.contains(e.nuclide)) {
+        return 'Extremity nuclide "${e.nuclide}" is not a supported selection.';
+      }
+    }
+
+    return null;
   }
 
   void saveToFile() async {
@@ -1165,6 +1245,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
 
         final Map<String, dynamic> state = jsonDecode(fileContent);
 
+        final parsedTasks = (state['tasks'] as List? ?? []).map((t) => TaskData.fromJson(t)).toList();
+        for (var i = 0; i < parsedTasks.length; i++) {
+          final err = _validateTaskForImport(parsedTasks[i]);
+          if (err != null) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Import rejected (Task ${i + 1}): $err')),
+              );
+            }
+            return;
+          }
+        }
+
         setState(() {
           workOrderController.text = state['projectInfo']?['workOrder'] ?? '';
           dateController.text = state['projectInfo']?['date'] ?? '';
@@ -1173,7 +1266,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
           for (final tt in tasks) {
             tt.disposeControllers();
           }
-          tasks = (state['tasks'] as List? ?? []).map((t) => TaskData.fromJson(t)).toList();
+          tasks = parsedTasks;
           // load trigger overrides if present
         triggerOverrides = Map<String, bool>.from(state['triggerOverrides'] ?? {});
         overrideJustifications = Map<String, String>.from(state['overrideJustifications'] ?? {});
@@ -1309,7 +1402,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
                             width: 15,
                             height: 15,
                             decoration: pw.BoxDecoration(
-                              color: finalTriggers['cams'] == true
+                              color: finalTriggers['camsRequired'] == true
                                   ? PdfColors.red
                                   : PdfColors.green,
                               shape: pw.BoxShape.circle,
