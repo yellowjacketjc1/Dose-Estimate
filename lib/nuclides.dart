@@ -89,7 +89,7 @@ class NuclideData {
     "Er-171": 1e-6,
     "Eu-152": 2e-8,
     "Eu-152m": 1e-6,
-    "Eu-154": 8e-9,
+    "Eu-154": 1e-8,
     "Eu-155": 7e-8,
 
     // F
@@ -184,16 +184,16 @@ class NuclideData {
     "Nd-149": 4e-6, // (W/Y)
     "Ni-56": 4e-7, // (Inorg F/Carbonyl)
     "Ni-57": 5e-7, // (Inorg F)
-    "Ni-59": 6e-7, // (Carbonyl)
-    "Ni-63": 2e-7, // (Carbonyl)
-    "Ni-65": 8e-7, // (Carbonyl)
+    "Ni-59": 2e-6, // (Carbonyl)
+    "Ni-63": 1e-6, // (Carbonyl)
+    "Ni-65": 4e-6, // (Carbonyl)
     "Np-235": 1e-6,
     "Np-236": 4e-11, // (Long-lived)
     "Np-237": 8e-12,
     "Np-239": 5e-7,
 
     // O
-    "Os-185": 5e-7, // (F/S)
+    "Os-185": 4e-7, // (F/S)
     "Os-191": 3e-7, // (S)
     "Os-191m": 4e-6, // (F)
     "Os-193": 8e-7, // (M/S)
@@ -289,7 +289,7 @@ class NuclideData {
     "Sm-147": 2e-11,
     "Sm-151": 7e-8,
     "Sm-153": 8e-7,
-    "Sn-113": 1e-7, // (M)
+    "Sn-113": 2e-7, // (M)
     "Sn-117m": 2e-7, // (F)
     "Sn-119m": 3e-7, // (F)
     "Sn-121": 2e-6, // (F)
@@ -324,10 +324,10 @@ class NuclideData {
     "Tc-98": 9e-8, // (F)
     "Tc-99": 1e-7, // (M)
     "Tc-99m": 1e-5, // (F/M)
-    "Te-121": 1e-7, // (Vapor/Particulate W)
+    "Te-121": 1e-6, // (Vapor/Particulate W)
     "Te-121m": 4e-8, // (Particulate Y)
     "Te-123": 1e-8, // (Vapor)
-    "Te-123m": 1e-7, // (Particulate W/Y)
+    "Te-123m": 5e-8, // (Particulate W/Y)
     "Te-125m": 1e-7, // (Vapor/Particulate Y)
     "Te-127": 3e-6, // (M)
     "Te-127m": 6e-8, // (Vapor)
