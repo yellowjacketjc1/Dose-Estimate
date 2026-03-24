@@ -1096,9 +1096,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
 
   static const Set<double> _allowedPfrValues = {1.0, 50.0, 1000.0};
   static const Set<double> _allowedPfeValues = {1.0, 1000.0, 100000.0};
-  static const Set<double> _allowedMpifRValues = {0.0, 1.0, 0.1, 0.01, 0.001};
-  static const Set<double> _allowedMpifCValues = {0.0, 100.0, 10.0, 1.0, 0.1, 0.01};
-  static const Set<double> _allowedMpifSValues = {0.0, 0.1, 1.0};
+  static final Set<double> _allowedMpifRValues = {0.0, 1.0, 0.1, 0.01, 0.001};
+  static final Set<double> _allowedMpifCValues = {0.0, 100.0, 10.0, 1.0, 0.1, 0.01};
+  static final Set<double> _allowedMpifSValues = {0.0, 0.1, 1.0};
 
   bool _isAllowedDouble(double value, Set<double> allowed) {
     const eps = 1e-9;
