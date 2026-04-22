@@ -4,11 +4,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:html' as html;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'containment.dart';
+import 'file_download_stub.dart'
+    if (dart.library.html) 'file_download_web.dart' as file_download;
 import 'nuclides.dart';
 
 void main() {
@@ -16,100 +17,137 @@ void main() {
 }
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const _kAccent    = Color(0xFF0A84FF); // iOS-style blue
-const _kAccentAlt = Color(0xFF30D158); // green for positive/pass
-const _kWarning   = Color(0xFFFF9F0A); // amber for warnings
-const _kDanger    = Color(0xFFFF453A); // red for triggered alerts
+// Light palette (warm gray — from design handoff)
+const _kBg        = Color(0xFFF7F6F3);
+const _kSurface   = Color(0xFFFFFFFF);
+const _kSurface2  = Color(0xFFFAF9F7);
+const _kSurface3  = Color(0xFFF2F1EC);
+const _kHairline  = Color(0xFFE7E5DE);
+const _kHairline2 = Color(0xFFEFEDE7);
+const _kInk1      = Color(0xFF1A1A18);
+const _kInk2      = Color(0xFF3D3C38);
+const _kInk3      = Color(0xFF6B6A63);
+const _kInk4      = Color(0xFF9A9892);
+const _kAccent    = Color(0xFF2B4B7A); // deep navy-blue
+const _kAccentInk = Color(0xFF203A60);
+const _kAccentWash= Color(0xFFEAF0F9);
+const _kOk        = Color(0xFF2E7D4F);
+const _kOkWash    = Color(0xFFE8F2EB);
+const _kWarn      = Color(0xFFB5711F);
+const _kWarnWash  = Color(0xFFFBF0DC);
+const _kDanger    = Color(0xFFB23434);
+const _kDangerWash= Color(0xFFF8E4E2);
+
+// Dark palette equivalents
+const _kDarkBg       = Color(0xFF131311);
+const _kDarkSurface  = Color(0xFF1C1C1A);
+const _kDarkSurface2 = Color(0xFF201F1D);
+const _kDarkHairline = Color(0xFF2E2D28);
+const _kDarkInk1     = Color(0xFFEEEDEA);
+const _kDarkInk2     = Color(0xFFB8B7B0);
+const _kDarkInk3     = Color(0xFF7A7972);
+const _kDarkInk4     = Color(0xFF5A5950);
 
 ThemeData _buildTheme(Brightness brightness) {
   final isDark = brightness == Brightness.dark;
-  final cs = ColorScheme.fromSeed(
-    seedColor: _kAccent,
+  final bg       = isDark ? _kDarkBg      : _kBg;
+  final surface  = isDark ? _kDarkSurface : _kSurface;
+  final hairline = isDark ? _kDarkHairline: _kHairline;
+  final ink1     = isDark ? _kDarkInk1    : _kInk1;
+  final ink3     = isDark ? _kDarkInk3    : _kInk3;
+
+  final cs = ColorScheme(
     brightness: brightness,
-  ).copyWith(
     primary: _kAccent,
-    secondary: _kAccentAlt,
+    onPrimary: Colors.white,
+    secondary: _kOk,
+    onSecondary: Colors.white,
     error: _kDanger,
-    surface: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-    // ignore: deprecated_member_use
-    background: isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7),
+    onError: Colors.white,
+    surface: surface,
+    onSurface: ink1,
   );
+
   return ThemeData(
     useMaterial3: true,
     colorScheme: cs,
-    scaffoldBackgroundColor: isDark ? const Color(0xFF000000) : const Color(0xFFF2F2F7),
+    scaffoldBackgroundColor: bg,
+    fontFamily: 'Inter',
     cardTheme: CardThemeData(
       elevation: 0,
-      color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: hairline),
+      ),
       margin: EdgeInsets.zero,
     ),
     appBarTheme: AppBarTheme(
       elevation: 0,
       scrolledUnderElevation: 0,
-      backgroundColor: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-      foregroundColor: isDark ? Colors.white : Colors.black,
+      backgroundColor: surface,
+      foregroundColor: ink1,
       titleTextStyle: TextStyle(
         fontWeight: FontWeight.w600,
-        fontSize: 17,
-        color: isDark ? Colors.white : Colors.black,
-        letterSpacing: -0.3,
+        fontSize: 14,
+        color: ink1,
+        letterSpacing: -0.2,
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
+      fillColor: isDark ? _kDarkSurface2 : _kSurface2,
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: hairline),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide.none,
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: hairline),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: _kAccent, width: 1.5),
       ),
-      labelStyle: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade400 : Colors.grey.shade600),
-      hintStyle: TextStyle(fontSize: 13, color: isDark ? Colors.grey.shade600 : Colors.grey.shade400),
-      contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+      labelStyle: TextStyle(fontSize: 12, color: ink3, fontWeight: FontWeight.w500),
+      hintStyle: TextStyle(fontSize: 13, color: _kInk4),
+      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
       isDense: true,
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: _kAccent,
-        foregroundColor: Colors.white,
+        backgroundColor: ink1,
+        foregroundColor: bg,
         elevation: 0,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 12.5),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(foregroundColor: _kAccent),
     ),
     dividerTheme: DividerThemeData(
-      color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA),
+      color: hairline,
       space: 1,
       thickness: 1,
     ),
     checkboxTheme: CheckboxThemeData(
-      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? _kAccent : Colors.transparent),
+      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? _kDanger : Colors.transparent),
       checkColor: WidgetStateProperty.all(Colors.white),
-      side: BorderSide(color: isDark ? Colors.grey.shade600 : Colors.grey.shade400, width: 1.5),
+      side: BorderSide(color: hairline, width: 1.5),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
     ),
     dropdownMenuTheme: DropdownMenuThemeData(
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+        fillColor: isDark ? _kDarkSurface2 : _kSurface2,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: hairline)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: hairline)),
       ),
     ),
     radioTheme: RadioThemeData(
-      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? _kAccent : (isDark ? Colors.grey.shade600 : Colors.grey.shade400)),
+      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? _kAccent : ink3),
     ),
   );
 }
@@ -152,91 +190,224 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _MainScreenState extends State<MainScreen> {
+  int _tab = 0; // 0 = dose, 1 = containment
   final GlobalKey<DoseEstimateScreenState> _doseEstimateKey = GlobalKey();
   final GlobalKey<ContainmentTabState> _containmentKey = GlobalKey();
 
   @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() { setState(() {}); });
-  }
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface  = isDark ? _kDarkSurface  : _kSurface;
+    final hairline = isDark ? _kDarkHairline : _kHairline;
+    final ink1     = isDark ? _kDarkInk1     : _kInk1;
+    final ink3     = isDark ? _kDarkInk3     : _kInk3;
+    final ink4     = isDark ? _kDarkInk4     : _kInk4;
+    final bg       = isDark ? _kDarkBg       : _kBg;
 
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+    return Scaffold(
+      backgroundColor: bg,
+      body: Column(children: [
+        // ── Topbar ────────────────────────────────────────────────────────
+        Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: surface,
+            border: Border(bottom: BorderSide(color: hairline)),
+          ),
+          child: Row(children: [
+            // Brand mark
+            Padding(
+              padding: const EdgeInsets.only(left: 20, right: 10),
+              child: Row(children: [
+                Container(
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    color: ink1,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Center(
+                    child: Text('R742',
+                      style: TextStyle(
+                        color: bg,
+                        fontSize: 7,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                        fontFamily: 'Courier',
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text('Dose Assessment',
+                  style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600,
+                    color: ink1, letterSpacing: -0.2,
+                  ),
+                ),
+              ]),
+            ),
+
+            // Tab buttons
+            Padding(
+              padding: const EdgeInsets.only(left: 12),
+              child: Row(children: [
+                _TopbarTab(
+                  label: 'Dose Estimate',
+                  icon: Icons.show_chart,
+                  active: _tab == 0,
+                  count: _doseEstimateKey.currentState?.tasks.length,
+                  onTap: () => setState(() => _tab = 0),
+                ),
+                const SizedBox(width: 4),
+                _TopbarTab(
+                  label: 'Containment Analysis',
+                  icon: Icons.shield_outlined,
+                  active: _tab == 1,
+                  onTap: () => setState(() => _tab = 1),
+                ),
+              ]),
+            ),
+
+            const Spacer(),
+
+            // Action buttons
+            if (_tab == 0) ...[
+              _TopbarAction(
+                label: 'Load',
+                icon: Icons.folder_outlined,
+                onTap: () => _doseEstimateKey.currentState?.loadFromFile(),
+              ),
+              _TopbarAction(
+                label: 'Save',
+                icon: Icons.save_outlined,
+                onTap: () => _doseEstimateKey.currentState?.saveToFile(),
+              ),
+              _TopbarAction(
+                label: 'Print',
+                icon: Icons.print_outlined,
+                onTap: () => _doseEstimateKey.currentState?.printSummaryReport(),
+              ),
+            ],
+            if (_tab == 1)
+              _TopbarAction(
+                label: 'Print',
+                icon: Icons.print_outlined,
+                onTap: () => _containmentKey.currentState?.printContainmentReport(),
+              ),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined, size: 16),
+              style: IconButton.styleFrom(
+                foregroundColor: ink3,
+                padding: const EdgeInsets.all(6),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: widget.onToggleTheme,
+              tooltip: isDark ? 'Light mode' : 'Dark mode',
+            ),
+            const SizedBox(width: 12),
+          ]),
+        ),
+
+        // ── Main content ──────────────────────────────────────────────────
+        Expanded(
+          child: IndexedStack(
+            index: _tab,
+            children: [
+              DoseEstimateScreen(
+                key: _doseEstimateKey,
+                onTaskCountChanged: () => setState(() {}),
+              ),
+              ContainmentTab(key: _containmentKey),
+            ],
+          ),
+        ),
+      ]),
+    );
   }
+}
+
+class _TopbarTab extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool active;
+  final int? count;
+  final VoidCallback onTap;
+
+  const _TopbarTab({required this.label, required this.icon, required this.active, this.count, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final dividerColor = isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+    final bg = isDark ? _kDarkBg : _kBg;
+    final ink1 = isDark ? _kDarkInk1 : _kInk1;
+    final ink3 = isDark ? _kDarkInk3 : _kInk3;
+    final surf3 = isDark ? const Color(0xFF2A2A27) : _kSurface3;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('RPP-742 Dose Assessment'),
-        centerTitle: false,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
-          child: Column(
-            children: [
-              Divider(height: 1, color: dividerColor),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: _SegmentedTabBar(
-                  controller: _tabController,
-                  labels: const ['Dose Estimate', 'Containment Analysis'],
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: active ? ink1 : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(children: [
+          Icon(icon, size: 13, color: active ? bg : ink3),
+          const SizedBox(width: 8),
+          Text(label,
+            style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w500,
+              color: active ? bg : ink3,
+            ),
+          ),
+          if (count != null) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: active ? Colors.white.withOpacity(0.14) : surf3,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text('$count',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: active ? bg : ink3,
+                  fontFamily: 'Courier',
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ],
-          ),
-        ),
-        actions: [
-          if (_tabController.index == 0) ...[
-            IconButton(
-              tooltip: 'Save',
-              onPressed: () => _doseEstimateKey.currentState?.saveToFile(),
-              icon: const Icon(Icons.save_outlined),
-            ),
-            IconButton(
-              tooltip: 'Load',
-              onPressed: () => _doseEstimateKey.currentState?.loadFromFile(),
-              icon: const Icon(Icons.folder_open_outlined),
-            ),
-            IconButton(
-              tooltip: 'Print report',
-              onPressed: () => _doseEstimateKey.currentState?.printSummaryReport(),
-              icon: const Icon(Icons.print_outlined),
-            ),
-            IconButton(
-              tooltip: 'Debug info',
-              onPressed: () => _doseEstimateKey.currentState?.showDebugInfo(),
-              icon: const Icon(Icons.bug_report_outlined),
             ),
           ],
-          if (_tabController.index == 1)
-            IconButton(
-              tooltip: 'Print containment report',
-              onPressed: () => _containmentKey.currentState?.printContainmentReport(),
-              icon: const Icon(Icons.print_outlined),
-            ),
-          IconButton(
-            tooltip: isDark ? 'Light mode' : 'Dark mode',
-            onPressed: widget.onToggleTheme,
-            icon: Icon(isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
-          ),
-          const SizedBox(width: 4),
-        ],
+        ]),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          DoseEstimateScreen(key: _doseEstimateKey),
-          ContainmentTab(key: _containmentKey),
-        ],
+    );
+  }
+}
+
+class _TopbarAction extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _TopbarAction({required this.label, required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink3 = isDark ? _kDarkInk3 : _kInk3;
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 14),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: ink3,
+        textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }
@@ -312,7 +483,7 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = triggered ? _kDanger : _kAccentAlt;
+    final color = triggered ? _kDanger : _kOk;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withOpacity(0.3))),
@@ -416,7 +587,7 @@ class _TriggerRow extends StatelessWidget {
       if (justification != null)
         Padding(
           padding: const EdgeInsets.only(left: 48, bottom: 6),
-          child: Text('Override: $justification', style: const TextStyle(fontSize: 11, color: _kWarning, fontStyle: FontStyle.italic)),
+          child: Text('Override: $justification', style: const TextStyle(fontSize: 11, color: _kWarn, fontStyle: FontStyle.italic)),
         ),
       Divider(height: 1, color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA)),
     ]);
@@ -479,8 +650,82 @@ class _SegmentedTabBar extends StatelessWidget {
   }
 }
 
+class _WorkField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+  const _WorkField({required this.label, required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.only(right: 18),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label.toUpperCase(), style: TextStyle(fontSize: 10.5, color: _kInk4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+        const SizedBox(height: 2),
+        IntrinsicWidth(
+          child: TextField(
+            controller: controller,
+            onChanged: (_) => onChanged(),
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDark ? _kDarkInk1 : _kInk1),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _WorkFieldRaw extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+  const _WorkFieldRaw({required this.label, required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label.toUpperCase(), style: TextStyle(fontSize: 10.5, color: _kInk4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+      const SizedBox(height: 2),
+      TextField(
+        controller: controller,
+        onChanged: (_) => onChanged(),
+        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: isDark ? _kDarkInk1 : _kInk1),
+        decoration: const InputDecoration(
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          filled: false,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    ]);
+  }
+}
+
+class _WorkDivider extends StatelessWidget {
+  final Color color;
+  const _WorkDivider({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 36, color: color, margin: const EdgeInsets.symmetric(horizontal: 0));
+  }
+}
+
 class DoseEstimateScreen extends StatefulWidget {
-  const DoseEstimateScreen({super.key});
+  final VoidCallback? onTaskCountChanged;
+  const DoseEstimateScreen({super.key, this.onTaskCountChanged});
 
   @override
   State<DoseEstimateScreen> createState() => DoseEstimateScreenState();
@@ -837,7 +1082,7 @@ class _AddTaskButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: _kAccentAlt,
+          color: _kOk,
           borderRadius: BorderRadius.circular(20),
         ),
         child: const Row(
@@ -853,7 +1098,7 @@ class _AddTaskButton extends StatelessWidget {
   }
 }
 
-class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+class DoseEstimateScreenState extends State<DoseEstimateScreen> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   
@@ -889,13 +1134,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
     'internalDose': false,
   };
 
-  late TabController tabController;
 
   @override
   void initState() {
     super.initState();
-    // Start with 1 tab: Summary (Containment moved to main tabs)
-    tabController = TabController(length: 1, vsync: this);
     tasks = [];
   }
 
@@ -911,50 +1153,36 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
     for (final t in tasks) {
       t.disposeControllers();
     }
-    tabController.dispose();
     super.dispose();
   }
 
   void addTask([TaskData? data]) {
     setState(() {
-      // If no explicit data provided and there are existing tasks, copy nuclides from first task
       if (data == null && tasks.isNotEmpty) {
-        // Copy nuclide selections from the first task
         final firstTaskNuclides = tasks.first.nuclides;
         final copiedNuclides = firstTaskNuclides.map((n) {
-          return NuclideEntry(
-            name: n.name,
-            contam: 0.0, // Reset contamination to 0.0 so user must enter new values
-            customDAC: n.customDAC, // Preserve custom DAC if "Other" was used
-          );
+          return NuclideEntry(name: n.name, contam: 0.0, customDAC: n.customDAC);
         }).toList();
-
         data = TaskData(nuclides: copiedNuclides);
       }
-
       tasks.add(data ?? TaskData());
-    // Update tab controller length: Summary + Tasks
-    tabController = TabController(length: tasks.length + 1, vsync: this);
-    tabController.index = tasks.length; // switch to new task tab
+      _activeIdx = tasks.length - 1;
     });
-    // Request focus on the new task title after frame
+    widget.onTaskCountChanged?.call();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (tasks.isNotEmpty) {
-        try {
-          tasks.last.titleFocusNode.requestFocus();
-        } catch (_) {}
+        try { tasks.last.titleFocusNode.requestFocus(); } catch (_) {}
       }
     });
   }
 
   void removeTask(int index) {
     setState(() {
-      // dispose controllers for the task being removed
       tasks[index].disposeControllers();
       tasks.removeAt(index);
-      tabController = TabController(length: tasks.length + 1, vsync: this);
-      tabController.index = 0;
+      _activeIdx = -1;
     });
+    widget.onTaskCountChanged?.call();
   }
 
   double computeMPIF(TaskData t) {
@@ -1523,17 +1751,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
         'overrideJustifications': overrideJustifications,
       };
       final jsonStr = jsonEncode(state);
-      final bytes = utf8.encode(jsonStr);
-      final blob = html.Blob([bytes]);
-      final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.document.createElement('a') as html.AnchorElement
-        ..href = url
-        ..style.display = 'none'
-        ..download = 'dose_assessment_${DateTime.now().millisecondsSinceEpoch}.json';
-      html.document.body?.children.add(anchor);
-      anchor.click();
-      html.document.body?.children.remove(anchor);
-      html.Url.revokeObjectUrl(url);
+      await file_download.downloadJson(
+        jsonStr,
+        'dose_assessment_${DateTime.now().millisecondsSinceEpoch}.json',
+      );
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File downloaded successfully.')));
       return;
     }
@@ -1615,8 +1836,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
           // load trigger overrides if present
         triggerOverrides = Map<String, bool>.from(state['triggerOverrides'] ?? {});
         overrideJustifications = Map<String, String>.from(state['overrideJustifications'] ?? {});
-        // Update tab controller length: Summary + Tasks
-        tabController = TabController(length: tasks.length + 1, vsync: this);
+        _activeIdx = tasks.isEmpty ? -1 : 0;
       });
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('File loaded successfully')));
       }
@@ -2256,111 +2476,261 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
     final totalIndivExtremity = tasks.fold<double>(0, (s, t) => s + calculateTaskTotals(t)['individualExtremity']!);
     final totalCollExtremity  = tasks.fold<double>(0, (s, t) => s + calculateTaskTotals(t)['collectiveExtremity']!);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Status badges row ──────────────────────────────────────────────
-        Row(children: [
-          _StatusBadge(label: 'ALARA Review',  triggered: finalTriggers['alaraReview'] == true),
-          const SizedBox(width: 8),
-          _StatusBadge(label: 'Air Sampling',  triggered: finalTriggers['airSampling'] == true),
-          const SizedBox(width: 8),
-          _StatusBadge(label: 'CAMs',          triggered: finalTriggers['camsRequired'] == true),
-        ]),
-        const SizedBox(height: 20),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface  = isDark ? _kDarkSurface  : _kSurface;
+    final hairline = isDark ? _kDarkHairline : _kHairline;
+    final ink1     = isDark ? _kDarkInk1     : _kInk1;
+    final ink2     = isDark ? _kDarkInk2     : _kInk2;
+    final ink3     = isDark ? _kDarkInk3     : _kInk3;
+    final ink4     = isDark ? _kDarkInk4     : _kInk4;
 
-        // ── Dose overview ─────────────────────────────────────────────────
-        _SectionHeader(title: 'Overall Dose'),
-        const SizedBox(height: 10),
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Collective dose card
-          Expanded(
-            flex: 3,
-            child: _InfoCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Total Collective Dose', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55))),
-                const SizedBox(height: 6),
-                Text(totalCollective.toStringAsFixed(2),
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary, height: 1)),
-                Text('person-mrem', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.4))),
-                const SizedBox(height: 14),
-                Row(children: [
-                  Expanded(child: _MiniStat(label: 'External', value: totalCollectiveExternal.toStringAsFixed(2), color: _kAccentAlt)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _MiniStat(label: 'Internal', value: formatNumber(totalCollectiveInternal), color: _kAccent)),
+    final indivStatus = totalCollective > 500 ? 'danger' : totalCollective > 250 ? 'warn' : 'pass';
+    final collStatus  = totalCollective > 750 ? 'danger' : totalCollective > 400 ? 'warn' : 'pass';
+
+    Color _summaryColor(String st) => st == 'danger' ? _kDanger : st == 'warn' ? _kWarn : _kOk;
+    Color _summaryWash(String st)  => st == 'danger' ? _kDangerWash : st == 'warn' ? _kWarnWash : _kOkWash;
+
+    Widget summaryBig(String label, String value, String unit, String status, String subLabel, double pct) {
+      final col  = _summaryColor(status);
+      final wash = isDark ? col.withValues(alpha: 0.12) : _summaryWash(status);
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: wash,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: col.withValues(alpha: isDark ? 0.3 : 0.2)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label.toUpperCase(), style: TextStyle(fontSize: 11, color: col.withValues(alpha: 0.8), fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+          const SizedBox(height: 10),
+          Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+            Text(value, style: TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: col, fontFamily: 'Courier', letterSpacing: -0.5)),
+            const SizedBox(width: 6),
+            Text(unit, style: TextStyle(fontSize: 12, color: col.withValues(alpha: 0.6), fontFamily: 'Courier')),
+          ]),
+          const SizedBox(height: 6),
+          Text(subLabel, style: TextStyle(fontSize: 11.5, color: col.withValues(alpha: 0.7))),
+          const SizedBox(height: 12),
+          Container(
+            height: 4,
+            decoration: BoxDecoration(color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(2)),
+            child: FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: pct.clamp(0.0, 1.0),
+              child: Container(decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(2))),
+            ),
+          ),
+        ]),
+      );
+    }
+
+    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // Center content
+      Expanded(child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(36, 28, 36, 80),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Header
+          Row(children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('SUMMARY', style: TextStyle(fontSize: 12, color: ink3, fontFamily: 'Courier', letterSpacing: 0.05)),
+              const SizedBox(height: 4),
+              Text('Dose assessment', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: ink1, letterSpacing: -0.3)),
+              const SizedBox(height: 4),
+              Text('${tasks.length} task${tasks.length != 1 ? "s" : ""} · ${formatNumber(tasks.fold(0.0, (s, t) => s + t.workers * t.hours))} person-hours',
+                style: TextStyle(fontSize: 12, color: ink3)),
+            ]),
+            const Spacer(),
+            Row(children: [
+              _StatusBadge(label: 'ALARA Review', triggered: finalTriggers['alaraReview'] == true),
+              const SizedBox(width: 8),
+              _StatusBadge(label: 'Air Sampling', triggered: finalTriggers['airSampling'] == true),
+              const SizedBox(width: 8),
+              _StatusBadge(label: 'CAMs',         triggered: finalTriggers['camsRequired'] == true),
+            ]),
+          ]),
+          const SizedBox(height: 22),
+
+          // Headline numbers (2 big cards)
+          Row(children: [
+            Expanded(child: summaryBig(
+              'Max individual effective dose',
+              formatNumber(totalCollective),
+              'mrem',
+              indivStatus,
+              'Threshold 500 mrem',
+              totalCollective / 500,
+            )),
+            const SizedBox(width: 12),
+            Expanded(child: summaryBig(
+              'Collective dose',
+              formatNumber(totalCollective),
+              'person-mrem',
+              collStatus,
+              'Threshold 750 person-mrem',
+              totalCollective / 750,
+            )),
+          ]),
+          const SizedBox(height: 28),
+
+          // Tasks table
+          Row(children: [
+            Text('TASKS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ink3, letterSpacing: 0.1)),
+            const Spacer(),
+            Text('Click a row to edit', style: TextStyle(fontSize: 11.5, color: ink4)),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: hairline),
+            ),
+            child: Column(children: [
+              // Header row
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: isDark ? _kDarkSurface2 : _kSurface2,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+                  border: Border(bottom: BorderSide(color: hairline)),
+                ),
+                child: Row(children: [
+                  SizedBox(width: 32, child: Text('#', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  Expanded(flex: 2, child: Text('TASK', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  SizedBox(width: 90, child: Text('P-HRS', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  SizedBox(width: 90, child: Text('mPIF', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  SizedBox(width: 110, child: Text('INDIV DOSE', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  SizedBox(width: 90, child: Text('DAC-HRS', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08))),
+                  SizedBox(width: 60, child: Text('STATUS', style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08), textAlign: TextAlign.right)),
                 ]),
-              ]),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Extremity dose card
-          Expanded(
-            flex: 2,
-            child: _InfoCard(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Extremity Dose', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55))),
-                const SizedBox(height: 14),
-                _MiniStat(label: 'Individual', value: totalIndivExtremity.toStringAsFixed(2), unit: 'mrem/person', color: _kWarning),
-                const SizedBox(height: 8),
-                _MiniStat(label: 'Collective', value: totalCollExtremity.toStringAsFixed(2), unit: 'person-mrem', color: _kWarning),
-              ]),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 24),
-
-        // ── Per-task summary ──────────────────────────────────────────────
-        _SectionHeader(title: 'Task Breakdown'),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: tasks.asMap().entries.map((entry) {
-              final i = entry.key;
-              final t = entry.value;
-              final totals = calculateTaskTotals(t);
-              final workers = t.workers;
-              final indExt  = workers > 0 ? (totals['collectiveExternal']! / workers) : 0.0;
-              final indInt  = workers > 0 ? (totals['collectiveInternal']! / workers) : 0.0;
-              final indExtr = totals['individualExtremity']!;
-              final indTot  = indExt + indInt;
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: SizedBox(
-                  width: 240,
-                  child: _InfoCard(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${i + 1}. ${t.title.isEmpty ? "Task ${i + 1}" : t.title}',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
-                      if (t.location.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(t.location, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.45)), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ],
-                      const SizedBox(height: 12),
-                      _MiniStat(label: 'Individual Effective', value: indTot.toStringAsFixed(2), unit: 'mrem', color: _kAccent),
-                      const SizedBox(height: 6),
-                      Row(children: [
-                        Expanded(child: _MiniStat(label: 'External', value: indExt.toStringAsFixed(2), color: _kAccentAlt)),
-                        const SizedBox(width: 6),
-                        Expanded(child: _MiniStat(label: 'Internal', value: formatNumber(indInt), color: _kAccent)),
-                      ]),
-                      const SizedBox(height: 6),
-                      _MiniStat(label: 'Extremity', value: indExtr.toStringAsFixed(2), unit: 'mrem', color: _kWarning),
+              ),
+              ...tasks.asMap().entries.map((entry) {
+                final i = entry.key;
+                final t = entry.value;
+                final tots = calculateTaskTotals(t);
+                final indiv = t.workers > 0 ? tots['collectiveEffective']! / t.workers : 0.0;
+                final dacHrs = (tots['totalDacFractionWithResp'] ?? 0.0) * t.hours;
+                final mPIF = tots['mPIF']!;
+                final st = indiv > 500 || dacHrs > 200 ? 'danger' : indiv > 250 || dacHrs > 40 ? 'warn' : 'ok';
+                final stColor = st == 'danger' ? _kDanger : st == 'warn' ? _kWarn : _kOk;
+                return GestureDetector(
+                  onTap: () => setState(() => _activeIdx = i),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: hairline.withValues(alpha: 0.5))),
+                    ),
+                    child: Row(children: [
+                      SizedBox(width: 32, child: Text('${(i + 1).toString().padLeft(2, '0')}',
+                        style: TextStyle(fontSize: 11, color: ink4, fontFamily: 'Courier'))),
+                      Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(t.title.isEmpty ? 'Untitled' : t.title,
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: ink1)),
+                        if (t.location.isNotEmpty)
+                          Text(t.location, style: TextStyle(fontSize: 11, color: ink3)),
+                      ])),
+                      SizedBox(width: 90, child: Text(formatNumber(tots['personHours']!),
+                        style: TextStyle(fontSize: 12, color: ink2, fontFamily: 'Courier'))),
+                      SizedBox(width: 90, child: Text(mPIF == 0 ? '—' : mPIF.toStringAsExponential(1),
+                        style: TextStyle(fontSize: 12, color: ink2, fontFamily: 'Courier'))),
+                      SizedBox(width: 110, child: Text('${formatNumber(indiv)} mrem',
+                        style: TextStyle(fontSize: 12, color: ink2, fontFamily: 'Courier'))),
+                      SizedBox(width: 90, child: Text(formatNumber(dacHrs),
+                        style: TextStyle(fontSize: 12, color: ink2, fontFamily: 'Courier'))),
+                      SizedBox(width: 60, child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: stColor.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(100),
+                          ),
+                          child: Text(st == 'ok' ? 'Clear' : st == 'warn' ? 'Watch' : 'Review',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: stColor, fontFamily: 'Courier', letterSpacing: 0.05)),
+                        ),
+                      )),
                     ]),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }),
+            ]),
           ),
-        ),
-        const SizedBox(height: 24),
+          const SizedBox(height: 28),
 
-        // ── Triggers detail ───────────────────────────────────────────────
-        buildTriggers(),
-      ],
-    );
+          // Triggers
+          buildTriggers(),
+        ]),
+      )),
+
+      // Right column (work order info)
+      SizedBox(
+        width: 380,
+        child: Container(
+          decoration: BoxDecoration(
+            color: surface,
+            border: Border(left: BorderSide(color: hairline)),
+          ),
+          child: Column(children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              decoration: BoxDecoration(border: Border(bottom: BorderSide(color: hairline))),
+              child: Row(children: [
+                Text('WORK ORDER', style: TextStyle(fontSize: 11, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.1)),
+              ]),
+            ),
+            Expanded(child: SingleChildScrollView(child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('NUMBER', style: TextStyle(fontSize: 10.5, color: ink4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+                const SizedBox(height: 4),
+                Text(workOrderController.text.isEmpty ? '—' : workOrderController.text,
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: ink1, fontFamily: 'Courier')),
+                const SizedBox(height: 12),
+                Text('DESCRIPTION', style: TextStyle(fontSize: 10.5, color: ink4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+                const SizedBox(height: 4),
+                Text(descriptionController.text.isEmpty ? '—' : descriptionController.text,
+                  style: TextStyle(fontSize: 13, color: ink1)),
+                const SizedBox(height: 12),
+                Text('DATE', style: TextStyle(fontSize: 10.5, color: ink4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+                const SizedBox(height: 4),
+                Text(dateController.text.isEmpty ? '—' : dateController.text,
+                  style: TextStyle(fontSize: 13, color: ink1, fontFamily: 'Courier')),
+                const SizedBox(height: 24),
+                Container(height: 1, color: hairline),
+                const SizedBox(height: 16),
+                Text('EXPORT', style: TextStyle(fontSize: 10.5, color: ink4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: printSummaryReport,
+                    icon: const Icon(Icons.print_outlined, size: 14),
+                    label: const Text('Print full report (PDF)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: ink1,
+                      foregroundColor: isDark ? _kDarkBg : _kBg,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: saveToFile,
+                    icon: const Icon(Icons.save_outlined, size: 14),
+                    label: const Text('Save as JSON'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: ink2,
+                      side: BorderSide(color: hairline),
+                    ),
+                  ),
+                ),
+              ]),
+            ))),
+          ]),
+        ),
+      ),
+    ]);
   }
 
   void showDebugInfo() {
@@ -2390,86 +2760,213 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
   }
 
 
+  // Active view: -1 = summary, 0..n-1 = task index
+  int _activeIdx = -1;
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface  = isDark ? _kDarkSurface  : _kSurface;
+    final surface2 = isDark ? _kDarkSurface2 : _kSurface2;
+    final hairline = isDark ? _kDarkHairline : _kHairline;
+    final ink1     = isDark ? _kDarkInk1     : _kInk1;
+    final ink2     = isDark ? _kDarkInk2     : _kInk2;
+    final ink3     = isDark ? _kDarkInk3     : _kInk3;
+    final ink4     = isDark ? _kDarkInk4     : _kInk4;
+    final bg       = isDark ? _kDarkBg       : _kBg;
 
-    final tabLabels = <String>['Summary'];
-    tabLabels.addAll(List.generate(tasks.length, (i) {
-      final td = tasks[i];
-      return td.title.trim().isEmpty ? 'Task ${i + 1}' : '${i + 1}. ${td.title}';
-    }));
+    // Clamp active index if tasks were deleted
+    if (_activeIdx >= tasks.length) _activeIdx = tasks.isEmpty ? -1 : tasks.length - 1;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Project info header ──────────────────────────────────────────────
-        Material(
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            child: Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: workOrderController,
-                  decoration: const InputDecoration(labelText: 'RWP Number'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 3,
-                child: TextField(
-                  controller: descriptionController,
-                  decoration: const InputDecoration(labelText: 'Work Description'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ]),
+        // ── Work order strip ─────────────────────────────────────────────────
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: surface2,
+            border: Border(bottom: BorderSide(color: hairline)),
           ),
-        ),
-        Divider(height: 1, color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA)),
-
-        // ── Task tab bar ─────────────────────────────────────────────────────
-        Material(
-          color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: _InnerTabBar(
-                    controller: tabController,
-                    labels: tabLabels,
-                  ),
+          child: Row(children: [
+            _WorkField(label: 'Work Order', controller: workOrderController, onChanged: () => setState(() {})),
+            _WorkDivider(color: hairline),
+            Expanded(flex: 2, child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: _WorkFieldRaw(label: 'Description', controller: descriptionController, onChanged: () => setState(() {})),
+            )),
+            _WorkDivider(color: hairline),
+            _WorkField(label: 'Date', controller: dateController, onChanged: () => setState(() {})),
+            _WorkDivider(color: hairline),
+            Padding(
+              padding: const EdgeInsets.only(left: 18),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('PREPARER', style: TextStyle(fontSize: 10.5, color: ink4, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+                const SizedBox(height: 2),
+                Text(
+                  workOrderController.text.isEmpty ? '—' : 'See work order',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: ink1),
                 ),
-              ),
-              const SizedBox(width: 12),
-              _AddTaskButton(onPressed: () {
-                addTask();
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  try { tabController.animateTo(tasks.length); } catch (_) {}
-                });
-              }),
-            ]),
-          ),
+              ]),
+            ),
+          ]),
         ),
-        Divider(height: 1, color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA)),
 
-        // ── Tab content ──────────────────────────────────────────────────────
+        // ── 3-column workspace ───────────────────────────────────────────────
         Expanded(
-          child: TabBarView(
-            controller: tabController,
-            children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: buildSummary(),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+
+            // Left rail (260px)
+            SizedBox(
+              width: 260,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: surface2,
+                  border: Border(right: BorderSide(color: hairline)),
+                ),
+                child: Column(children: [
+                  // Summary item
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _activeIdx = -1),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: ink1,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(children: [
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('Summary', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: bg)),
+                            const SizedBox(height: 2),
+                            Text('All tasks · triggers', style: TextStyle(fontSize: 10.5, color: bg.withOpacity(0.7), fontFamily: 'Courier', letterSpacing: 0.05)),
+                          ])),
+                          Icon(Icons.layers_outlined, size: 14, color: bg.withOpacity(0.7)),
+                        ]),
+                      ),
+                    ),
+                  ),
+
+                  // Tasks header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                    child: Row(children: [
+                      Text('TASKS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ink3, letterSpacing: 0.08)),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF2A2A27) : _kSurface3,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text('${tasks.length}', style: TextStyle(fontSize: 11, color: ink3, fontFamily: 'Courier', fontWeight: FontWeight.w600)),
+                      ),
+                    ]),
+                  ),
+
+                  // Task list
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      itemCount: tasks.length,
+                      itemBuilder: (ctx, i) {
+                        final t = tasks[i];
+                        final totals = calculateTaskTotals(t);
+                        final indiv = t.workers > 0 ? (totals['collectiveEffective']! / t.workers) : 0.0;
+                        final triggered = indiv > 500;
+                        final active = _activeIdx == i;
+                        return GestureDetector(
+                          onTap: () => setState(() => _activeIdx = i),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 2),
+                            padding: EdgeInsets.fromLTRB(triggered ? 10 : 12, 10, 12, 10),
+                            decoration: BoxDecoration(
+                              color: active ? surface : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border(
+                                left: triggered ? const BorderSide(color: _kDanger, width: 2) : BorderSide.none,
+                                right: active ? BorderSide(color: hairline) : BorderSide.none,
+                                top: active ? BorderSide(color: hairline) : BorderSide.none,
+                                bottom: active ? BorderSide(color: hairline) : BorderSide.none,
+                              ),
+                              boxShadow: active ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 2, offset: const Offset(0, 1))] : null,
+                            ),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Row(children: [
+                                Expanded(
+                                  child: Text(
+                                    t.title.isEmpty ? 'Untitled task' : t.title,
+                                    style: TextStyle(
+                                      fontSize: 13, fontWeight: FontWeight.w600,
+                                      color: t.title.isEmpty ? ink4 : ink1,
+                                      fontStyle: t.title.isEmpty ? FontStyle.italic : FontStyle.normal,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF2A2A27) : _kSurface3,
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: Text('#${(i + 1).toString().padLeft(2, '0')}',
+                                    style: TextStyle(fontSize: 10.5, color: ink4, fontFamily: 'Courier', fontWeight: FontWeight.w600)),
+                                ),
+                              ]),
+                              const SizedBox(height: 4),
+                              Row(children: [
+                                Text('${t.workers}p · ${t.hours}hr', style: TextStyle(fontSize: 11, color: ink3)),
+                                Text(' · ', style: TextStyle(fontSize: 11, color: ink4)),
+                                Text(formatNumber(indiv), style: TextStyle(fontSize: 11, color: ink2, fontFamily: 'Courier', fontWeight: FontWeight.w500)),
+                                Text(' mrem', style: TextStyle(fontSize: 11, color: ink4)),
+                              ]),
+                            ]),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // Add task button
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 12),
+                    decoration: BoxDecoration(border: Border(top: BorderSide(color: hairline))),
+                    child: GestureDetector(
+                      onTap: () {
+                        addTask();
+                        widget.onTaskCountChanged?.call();
+                        setState(() => _activeIdx = tasks.length - 1);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: BoxDecoration(
+                          color: surface,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: hairline, style: BorderStyle.solid),
+                        ),
+                        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(Icons.add, size: 13, color: ink3),
+                          const SizedBox(width: 6),
+                          Text('Add task', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: ink3)),
+                        ]),
+                      ),
+                    ),
+                  ),
+                ]),
               ),
-              ...List.generate(tasks.length, (i) => buildTaskTab(i)),
-            ],
-          ),
+            ),
+
+            // Center + right panel
+            Expanded(
+              child: _activeIdx < 0
+                ? buildSummary()
+                : (_activeIdx < tasks.length ? buildTaskTab(_activeIdx) : const SizedBox()),
+            ),
+          ]),
         ),
       ],
     );
@@ -2543,9 +3040,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      // Center content
+      Expanded(child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(36, 28, 36, 80),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
         // ── Task header ────────────────────────────────────────────────────
         _InfoCard(
@@ -2682,7 +3181,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
             ),
             const SizedBox(height: 12),
             Row(children: [
-              Expanded(child: _MiniStat(label: 'Person-Hours', value: totals['personHours']!.toStringAsFixed(2), color: _kAccentAlt)),
+              Expanded(child: _MiniStat(label: 'Person-Hours', value: totals['personHours']!.toStringAsFixed(2), color: _kOk)),
               const SizedBox(width: 12),
               Expanded(child: _MiniStat(label: 'Collective External', value: totals['collectiveExternal']!.toStringAsFixed(2), unit: 'mrem', color: _kAccent)),
             ]),
@@ -2753,9 +3252,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
             ),
             const SizedBox(height: 8),
             Row(children: [
-              Expanded(child: _MiniStat(label: 'Individual Extremity', value: totals['individualExtremity']!.toStringAsFixed(2), unit: 'mrem/person', color: _kWarning)),
+              Expanded(child: _MiniStat(label: 'Individual Extremity', value: totals['individualExtremity']!.toStringAsFixed(2), unit: 'mrem/person', color: _kWarn)),
               const SizedBox(width: 12),
-              Expanded(child: _MiniStat(label: 'Collective Extremity', value: totals['collectiveExtremity']!.toStringAsFixed(2), unit: 'mrem', color: _kWarning)),
+              Expanded(child: _MiniStat(label: 'Collective Extremity', value: totals['collectiveExtremity']!.toStringAsFixed(2), unit: 'mrem', color: _kWarn)),
             ]),
           ]),
         ),
@@ -2861,9 +3360,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
                     const SizedBox(width: 8),
                     Expanded(child: _MiniStat(label: 'DAC Frac. (post-PFE)', value: dacFrEng.isFinite ? formatNumber(dacFrEng) : '0', color: _kAccent)),
                     const SizedBox(width: 8),
-                    Expanded(child: _MiniStat(label: 'Ind. Internal', value: formatNumber(nuclideIndiv), unit: 'mrem', color: _kAccentAlt)),
+                    Expanded(child: _MiniStat(label: 'Ind. Internal', value: formatNumber(nuclideIndiv), unit: 'mrem', color: _kOk)),
                     const SizedBox(width: 8),
-                    Expanded(child: _MiniStat(label: 'Coll. Internal', value: formatNumber(nuclideCollective), unit: 'mrem', color: _kAccentAlt)),
+                    Expanded(child: _MiniStat(label: 'Coll. Internal', value: formatNumber(nuclideCollective), unit: 'mrem', color: _kOk)),
                   ]),
                 ),
                 const SizedBox(height: 8),
@@ -2883,30 +3382,214 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen> with TickerProvi
         ),
         const SizedBox(height: 16),
 
-        // ── Task totals ────────────────────────────────────────────────────
-        _SectionHeader(title: 'Task Results'),
-        const SizedBox(height: 10),
-        _InfoCard(
-          child: Column(children: [
-            Row(children: [
-              Expanded(child: _MiniStat(label: 'DAC Frac (post-PFE)', value: formatNumber(totals['totalDacFraction'] ?? 0.0), color: _kAccent)),
-              const SizedBox(width: 12),
-              Expanded(child: _MiniStat(label: 'DAC-hours (post-PFE)', value: formatNumber((totals['totalDacFraction'] ?? 0.0) * t.hours), color: _kAccent)),
-            ]),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: _MiniStat(label: 'Collective Effective', value: totals['collectiveEffective']!.toStringAsFixed(2), unit: 'mrem', color: _kAccent)),
-              const SizedBox(width: 12),
-              Expanded(child: _MiniStat(label: 'Individual Effective', value: totals['individualEffective']!.toStringAsFixed(2), unit: 'mrem/person', color: _kAccentAlt)),
-              const SizedBox(width: 12),
-              Expanded(child: _MiniStat(label: 'Individual Extremity', value: totals['individualExtremity']!.toStringAsFixed(2), unit: 'mrem/person', color: _kWarning)),
-            ]),
-            if (totals['respiratorPenalty']! > 1.0) ...[
-              const SizedBox(height: 10),
-              _InfoNote(text: 'Doses include 15% respirator penalty (×1.15).'),
+      ]),
+    )),
+
+      // Right rail (380px) — live results
+      SizedBox(width: 380, child: _TaskRightRail(
+        task: t,
+        totals: totals,
+        formatNumber: formatNumber,
+        isDark: isDark,
+      )),
+    ]);
+  }
+}
+
+// ─── Right rail: live task results ────────────────────────────────────────────
+class _TaskRightRail extends StatelessWidget {
+  final TaskData task;
+  final Map<String, double> totals;
+  final String Function(double) formatNumber;
+  final bool isDark;
+
+  const _TaskRightRail({
+    required this.task,
+    required this.totals,
+    required this.formatNumber,
+    required this.isDark,
+  });
+
+  Color _statusColor(String level) => level == 'danger' ? _kDanger : level == 'warn' ? _kWarn : _kOk;
+  Color _statusWash(String level) => level == 'danger' ? _kDangerWash : level == 'warn' ? _kWarnWash : _kOkWash;
+
+  @override
+  Widget build(BuildContext context) {
+    final surface   = isDark ? _kDarkSurface : _kSurface;
+    final hairline  = isDark ? _kDarkHairline : _kHairline;
+    final hairline2 = isDark ? const Color(0xFF252420) : _kHairline2;
+    final ink1  = isDark ? _kDarkInk1  : _kInk1;
+    final ink2  = isDark ? _kDarkInk2  : _kInk2;
+    final ink3  = isDark ? _kDarkInk3  : _kInk3;
+
+    final indivInt = task.workers > 0 ? (totals['collectiveInternal']! / task.workers) : 0.0;
+    final indivExt = task.workers > 0 ? (totals['collectiveExternal']! / task.workers) : 0.0;
+    final indivTotal = indivInt + indivExt;
+    final indivPct = (indivTotal / 500).clamp(0.0, 1.0);
+    final indivLevel = indivTotal > 500 ? 'danger' : indivTotal > 250 ? 'warn' : 'ok';
+
+    final collEff = totals['collectiveEffective']!;
+    final collPct = (collEff / 750).clamp(0.0, 1.0);
+    final collLevel = collEff > 750 ? 'danger' : collEff > 400 ? 'warn' : 'ok';
+
+    final dacFrac = totals['totalDacFractionWithResp']!;
+    final dacHrs = dacFrac * task.hours;
+    final dacPct = (dacHrs / 40).clamp(0.0, 1.0);
+    final dacLevel = dacHrs > 200 ? 'danger' : dacHrs > 40 ? 'warn' : 'ok';
+
+    Widget metric(String label, String value, {String? unit, bool big = false, String? level}) {
+      final valColor = level != null ? _statusColor(level) : ink1;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Expanded(child: Text(label, style: TextStyle(fontSize: 12, color: ink2))),
+          Text(value, style: TextStyle(
+            fontSize: big ? 18 : 13,
+            fontWeight: FontWeight.w600,
+            color: valColor,
+            fontFamily: 'Courier',
+            letterSpacing: -0.5,
+          )),
+          if (unit != null) ...[
+            const SizedBox(width: 3),
+            Text(unit, style: TextStyle(fontSize: 10.5, color: ink3, fontFamily: 'Courier')),
+          ],
+        ]),
+      );
+    }
+
+    Widget bigMetricCard(String label, String value, {String? unit, required String level, String? sub}) {
+      final bg = _statusWash(level);
+      final col = _statusColor(level);
+      return Container(
+        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: isDark ? col.withValues(alpha: 0.12) : bg,
+          border: Border.all(color: col.withValues(alpha: isDark ? 0.3 : 0.25)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: TextStyle(fontSize: 11, color: col.withValues(alpha: 0.8), fontWeight: FontWeight.w500)),
+          const SizedBox(height: 4),
+          Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
+            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: col, fontFamily: 'Courier', letterSpacing: -0.02)),
+            if (unit != null) ...[
+              const SizedBox(width: 4),
+              Text(unit, style: TextStyle(fontSize: 11, color: col.withValues(alpha: 0.6), fontFamily: 'Courier')),
             ],
           ]),
+          if (sub != null) ...[
+            const SizedBox(height: 3),
+            Text(sub, style: TextStyle(fontSize: 11, color: col.withValues(alpha: 0.7))),
+          ],
+        ]),
+      );
+    }
+
+    Widget progressBar(double pct, String level) {
+      return Container(
+        height: 4,
+        decoration: BoxDecoration(color: isDark ? const Color(0xFF2A2A27) : hairline, borderRadius: BorderRadius.circular(2)),
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: pct,
+          child: Container(
+            decoration: BoxDecoration(color: _statusColor(level), borderRadius: BorderRadius.circular(2)),
+          ),
         ),
+      );
+    }
+
+    Widget group(String title, List<Widget> children) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: hairline2))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title.toUpperCase(), style: TextStyle(fontSize: 10.5, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.08)),
+          const SizedBox(height: 10),
+          ...children,
+        ]),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        border: Border(left: BorderSide(color: hairline)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        // Header
+        Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: hairline))),
+          child: Row(children: [
+            Text('LIVE RESULTS', style: TextStyle(fontSize: 11, color: ink3, fontWeight: FontWeight.w600, letterSpacing: 0.1)),
+            const Spacer(),
+            Row(children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: _kOk, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text('TASK', style: TextStyle(fontSize: 10.5, color: ink3, fontFamily: 'Courier', letterSpacing: 0.06)),
+            ]),
+          ]),
+        ),
+        Expanded(child: SingleChildScrollView(child: Column(children: [
+          // Individual + collective cards
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+            child: Column(children: [
+              bigMetricCard(
+                'Individual effective dose',
+                formatNumber(indivTotal),
+                unit: 'mrem',
+                level: indivLevel,
+                sub: 'External ${formatNumber(indivExt)} · Internal ${formatNumber(indivInt)} · of 500 limit',
+              ),
+              SizedBox(height: 4),
+              progressBar(indivPct, indivLevel),
+              const SizedBox(height: 12),
+              bigMetricCard(
+                'Collective dose',
+                formatNumber(collEff),
+                unit: 'p-mrem',
+                level: collLevel,
+                sub: 'of 750 ALARA threshold',
+              ),
+              SizedBox(height: 4),
+              progressBar(collPct, collLevel),
+            ]),
+          ),
+
+          // Intake & airborne
+          group('Intake & Airborne', [
+            metric('mPIF', totals['mPIF']! == 0 ? '—' : totals['mPIF']!.toStringAsExponential(2), big: true),
+            metric('Σ DAC fraction (eng only)', formatNumber(totals['totalDacFractionEngOnly'] ?? 0.0)),
+            metric('Σ DAC fraction (w/ resp)', formatNumber(totals['totalDacFractionWithResp'] ?? 0.0)),
+            metric('DAC-hours (post-resp)', formatNumber(dacHrs), unit: 'DAC-hr', level: dacLevel),
+            const SizedBox(height: 4),
+            progressBar(dacPct, dacLevel),
+            const SizedBox(height: 4),
+            Text('Sampling threshold: 40 DAC-hr/yr', style: TextStyle(fontSize: 11, color: ink3)),
+          ]),
+
+          // Extremity
+          group('Extremity', [
+            metric('Individual', formatNumber(totals['individualExtremity'] ?? 0.0), unit: 'mrem'),
+            metric('Collective', formatNumber(totals['collectiveExtremity'] ?? 0.0), unit: 'p-mrem'),
+          ]),
+
+          // Breakdown
+          group('Task Breakdown', [
+            metric('Person-hours', formatNumber(totals['personHours'] ?? 0.0), unit: 'hr'),
+            metric('External (collective)', formatNumber(totals['collectiveExternal'] ?? 0.0)),
+            metric('Internal (collective)', formatNumber(totals['collectiveInternal'] ?? 0.0)),
+            if ((totals['respiratorPenalty'] ?? 1.0) > 1.0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text('Includes 15% respirator penalty (×1.15)', style: TextStyle(fontSize: 11, color: ink3, fontStyle: FontStyle.italic)),
+              ),
+          ]),
+        ]))),
       ]),
     );
   }
