@@ -330,8 +330,6 @@ class ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAliveC
   Future<void> printContainmentReport() async {
     try {
       final pdf = pw.Document();
-      final timestamp = DateTime.now().toIso8601String();
-      
       pdf.addPage(
         pw.Page(
           pageFormat: PdfPageFormat.letter,
@@ -575,323 +573,796 @@ class ContainmentTabState extends State<ContainmentTab> with AutomaticKeepAliveC
     }
   }
 
+  // ─── Design token shorthands (warm-gray system from main.dart) ───────────
+  static const _accent    = Color(0xFF2B4B7A);
+  static const _accentWash= Color(0xFFEAF0F9);
+  static const _ok        = Color(0xFF2E7D4F);
+  static const _okWash    = Color(0xFFE8F2EB);
+  static const _warn      = Color(0xFFB5711F);
+  static const _danger    = Color(0xFFB23434);
+  static const _dangerWash= Color(0xFFF8E4E2);
+  static const _ink1      = Color(0xFF1A1A18);
+  static const _ink2      = Color(0xFF3D3C38);
+  static const _ink3      = Color(0xFF6B6A63);
+  static const _ink4      = Color(0xFF9A9892);
+  static const _hairline  = Color(0xFFE7E5DE);
+  static const _surface3  = Color(0xFFF2F1EC);
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
-    const accent    = Color(0xFF0A84FF);
-    const accentAlt = Color(0xFF30D158);
-    const warning   = Color(0xFFFF9F0A);
-    const danger    = Color(0xFFFF453A);
-
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF1C1C1E) : Colors.white;
-    final borderColor = isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+    final cardBg     = isDark ? const Color(0xFF1C1C1A) : Colors.white;
+    final cardBorder = isDark ? const Color(0xFF2E2D28) : _hairline;
+    final surface3   = isDark ? const Color(0xFF2A2A27) : _surface3;
+    final ink1       = isDark ? const Color(0xFFEEEDEA) : _ink1;
+    final ink2       = isDark ? const Color(0xFFB8B7B0) : _ink2;
+    final ink3       = isDark ? const Color(0xFF7A7972) : _ink3;
+    final ink4       = isDark ? const Color(0xFF5A5950) : _ink4;
 
-    Widget card({required String title, required Widget child}) {
+    // ── Helper: section card ─────────────────────────────────────────────
+    Widget sectionCard({required String sectionNum, required String title, String? hint, required Widget child}) {
       return Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderColor)),
+        margin: const EdgeInsets.only(bottom: 14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: cardBorder),
+        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: -0.2)),
-          const SizedBox(height: 14),
-          child,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            child: Row(children: [
+              Text('$sectionNum — $title',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: ink1, letterSpacing: -0.1)),
+              if (hint != null) ...[
+                const SizedBox(width: 10),
+                Text(hint, style: TextStyle(fontSize: 11, color: ink4)),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 12),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 16), child: child),
         ]),
       );
     }
 
-    double totalFraction = sourceTerm.fold(0.0, (sum, e) => sum + e.fraction);
-    bool fractionError = (totalFraction - 1.0).abs() > 0.001;
-    final currentFa = double.tryParse(faController.text) ?? 0.0;
-    final faError = selectedConfinement != null && (currentFa < selectedConfinement!.minFa || currentFa > selectedConfinement!.maxFa);
-    final currentFr = double.tryParse(frController.text) ?? 0.0;
-    final frError = selectedForm != null && (currentFr < selectedForm!.minFr || currentFr > selectedForm!.maxFr);
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-
-        // 1. Confinement Type
-        card(
-          title: '1. Confinement Type',
-          child: DropdownButtonFormField<UnifiedConfinementType>(
-            value: selectedConfinement,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Select confinement type'),
-            items: confinementTypes.map((e) => DropdownMenuItem(value: e, child: Text(e.name, overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: onConfinementChanged,
+    // ── Helper: pill selector row ─────────────────────────────────────────
+    Widget pillSelect<T>({
+      required List<T> options,
+      required T? selected,
+      required String Function(T) label,
+      required String Function(T) sublabel,
+      required void Function(T) onTap,
+    }) {
+      return Wrap(spacing: 6, runSpacing: 6, children: options.map((o) {
+        final isSelected = selected == o;
+        return GestureDetector(
+          onTap: () => onTap(o),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 130),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSelected ? _accent : surface3,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: isSelected ? _accent : cardBorder),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(label(o),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : ink2)),
+              const SizedBox(width: 5),
+              Text(sublabel(o),
+                style: TextStyle(fontSize: 11,
+                  color: isSelected ? Colors.white.withOpacity(0.75) : ink4)),
+            ]),
           ),
-        ),
+        );
+      }).toList());
+    }
 
-        // 2. Source Term
-        card(
-          title: '2. Source Term & Activity',
+    // ── Derived values for validation ────────────────────────────────────
+    final double totalFraction = sourceTerm.fold(0.0, (s, e) => s + e.fraction);
+    final bool fractionError   = (totalFraction - 1.0).abs() > 0.001;
+    final double currentFa     = double.tryParse(faController.text) ?? 0.0;
+    final bool faError         = selectedConfinement != null && (currentFa < selectedConfinement!.minFa || currentFa > selectedConfinement!.maxFa);
+    final double currentFr     = double.tryParse(frController.text) ?? 0.0;
+    final bool frError         = selectedForm != null && (currentFr < selectedForm!.minFr || currentFr > selectedForm!.maxFr);
+
+    // ── Per-nuclide contributions for side panel ─────────────────────────
+    final List<({String name, double contrib, double pct})> nuclideContribs = [];
+    if (calculatedResult != null && calculatedResult! > 0) {
+      final fr = double.tryParse(frController.text) ?? 0.0;
+      final fa = double.tryParse(faController.text) ?? 0.0;
+      final volume = double.tryParse(volumeController.text) ?? 1.0;
+      final mixing = double.tryParse(mixingController.text) ?? 1.0;
+      final uncertainty = double.tryParse(uncertaintyController.text) ?? 1.0;
+      final activity = double.tryParse(totalActivityController.text) ?? 0.0;
+      for (final e in sourceTerm) {
+        if (e.dac <= 0 || e.fraction <= 0) continue;
+        final contrib = (activity * e.fraction * fr * fa * uncertainty) / (2000 * volume * mixing * e.dac);
+        final pct = (contrib / calculatedResult!) * 100;
+        nuclideContribs.add((name: e.name, contrib: contrib, pct: pct.clamp(0.0, 100.0)));
+      }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // MAIN LAYOUT — 2-column: scrollable content | fixed 380px side panel
+    // ════════════════════════════════════════════════════════════════════
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+      // ── LEFT: scrollable form content ──────────────────────────────────
+      Expanded(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 12, 40),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Toggle
+
+            // Page header
             Row(children: [
-              const Text('Input:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              const SizedBox(width: 12),
-              ToggleButtons(
-                isSelected: [!useContaminationInput, useContaminationInput],
-                onPressed: (i) => setState(() { useContaminationInput = i == 1; }),
-                borderRadius: BorderRadius.circular(8),
-                constraints: const BoxConstraints(minHeight: 32, minWidth: 110),
-                selectedColor: Colors.white,
-                fillColor: accent,
-                color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-                borderColor: borderColor,
-                selectedBorderColor: accent,
-                children: const [Text('Direct Activity', style: TextStyle(fontSize: 12)), Text('Contamination', style: TextStyle(fontSize: 12))],
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(color: _accentWash, borderRadius: BorderRadius.circular(4)),
+                    child: Text('CONTAINMENT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _accent, letterSpacing: 0.5)),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('Confinement adequacy assessment',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: ink1, letterSpacing: -0.3)),
+                ]),
+                const SizedBox(height: 4),
+                Text('Sum-of-fractions and bioassay threshold per RPP-742',
+                  style: TextStyle(fontSize: 12, color: ink4)),
+              ])),
+              TextButton.icon(
+                onPressed: printContainmentReport,
+                icon: const Icon(Icons.print_outlined, size: 15),
+                label: const Text('Print', style: TextStyle(fontSize: 13)),
+                style: TextButton.styleFrom(foregroundColor: _accent),
               ),
             ]),
-            const SizedBox(height: 14),
-            if (useContaminationInput) ...[
-              Row(children: [
-                Expanded(child: TextField(controller: contaminationController, decoration: const InputDecoration(labelText: 'Contamination (dpm/100cm²)'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculateContamination())),
-                const SizedBox(width: 12),
-                Expanded(child: TextField(controller: areaController, decoration: const InputDecoration(labelText: 'Area (cm²)'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculateContamination())),
-              ]),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(color: accent.withOpacity(0.07), borderRadius: BorderRadius.circular(8)),
-                child: Row(children: [
-                  Icon(Icons.info_outline, size: 14, color: accent.withOpacity(0.7)),
-                  const SizedBox(width: 8),
-                  Text('Calculated Activity: ${totalActivityController.text} µCi', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: accent)),
-                ]),
-              ),
-            ] else
-              TextField(controller: totalActivityController, decoration: const InputDecoration(labelText: 'Total Activity (µCi)'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculate()),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
-            // Nuclide table header
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Nuclide Mixture', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              GestureDetector(
-                onTap: addNuclideRow,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: accentAlt, borderRadius: BorderRadius.circular(20)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.add, size: 14, color: Colors.white),
-                    SizedBox(width: 4),
-                    Text('Add Nuclide', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+            // ── 01 Confinement type ──────────────────────────────────────
+            sectionCard(
+              sectionNum: '01',
+              title: 'Confinement type',
+              hint: 'Determines C factor and default fa range',
+              child: pillSelect<UnifiedConfinementType>(
+                options: confinementTypes,
+                selected: selectedConfinement,
+                label: (c) => c.name,
+                sublabel: (c) => 'C=${c.pifC}',
+                onTap: onConfinementChanged,
+              ),
+            ),
+
+            // ── 02 Source term & activity ────────────────────────────────
+            sectionCard(
+              sectionNum: '02',
+              title: 'Source term & activity',
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                // Toggle
+                Row(children: [
+                  _PillToggle(
+                    options: const ['Direct activity', 'Contamination'],
+                    selectedIndex: useContaminationInput ? 1 : 0,
+                    onChanged: (i) => setState(() { useContaminationInput = i == 1; }),
+                    accent: _accent,
+                    surface3: surface3,
+                    cardBorder: cardBorder,
+                    ink2: ink2,
+                  ),
+                ]),
+                const SizedBox(height: 14),
+                if (useContaminationInput) ...[
+                  Row(children: [
+                    Expanded(child: TextField(
+                      controller: contaminationController,
+                      decoration: const InputDecoration(labelText: 'Contamination (dpm/100cm²)', isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculateContamination(),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: TextField(
+                      controller: areaController,
+                      decoration: const InputDecoration(labelText: 'Area (cm²)', isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculateContamination(),
+                    )),
+                  ]),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(color: _accentWash, borderRadius: BorderRadius.circular(7)),
+                    child: Row(children: [
+                      const Icon(Icons.info_outline, size: 14, color: _accent),
+                      const SizedBox(width: 8),
+                      Text('Calculated activity: ${totalActivityController.text} µCi',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _accent)),
+                    ]),
+                  ),
+                ] else
+                  TextField(
+                    controller: totalActivityController,
+                    decoration: const InputDecoration(labelText: 'Total activity (µCi)', isDense: true),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    onChanged: (_) => calculate(),
+                  ),
+                const SizedBox(height: 16),
+
+                // Nuclide mixture table
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text('Nuclide mixture',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink3, letterSpacing: 0.3)),
+                  GestureDetector(
+                    onTap: addNuclideRow,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: surface3, borderRadius: BorderRadius.circular(6), border: Border.all(color: cardBorder)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(Icons.add, size: 13, color: _accent),
+                        const SizedBox(width: 4),
+                        Text('Add nuclide', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _accent)),
+                      ]),
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: cardBorder),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: surface3,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+                      ),
+                      child: Row(children: [
+                        Expanded(flex: 3, child: Text('NUCLIDE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: ink4, letterSpacing: 0.4))),
+                        Expanded(flex: 2, child: Text('FRACTION', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: ink4, letterSpacing: 0.4))),
+                        Expanded(flex: 2, child: Text('DAC (µCi/mL)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: ink4, letterSpacing: 0.4))),
+                        const SizedBox(width: 36),
+                      ]),
+                    ),
+                    ...sourceTerm.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final item = entry.value;
+                      return Container(
+                        key: item.key,
+                        decoration: BoxDecoration(
+                          border: Border(top: BorderSide(color: cardBorder)),
+                        ),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                          // Nuclide autocomplete
+                          Expanded(flex: 3, child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            child: LayoutBuilder(builder: (ctx, constraints) => RawAutocomplete<String>(
+                              textEditingController: item.nameController,
+                              focusNode: FocusNode(),
+                              optionsBuilder: (tv) {
+                                if (NuclideData.dacValues.containsKey(tv.text) && item.name != tv.text) {
+                                  WidgetsBinding.instance.addPostFrameCallback((_) => updateNuclide(idx, tv.text));
+                                }
+                                return tv.text.isEmpty
+                                  ? NuclideData.dacValues.keys
+                                  : NuclideData.dacValues.keys.where((o) => o.toLowerCase().contains(tv.text.toLowerCase()));
+                              },
+                              onSelected: (s) => updateNuclide(idx, s),
+                              fieldViewBuilder: (ctx, ctrl, fn, onSub) => TextFormField(
+                                controller: ctrl,
+                                focusNode: fn,
+                                decoration: const InputDecoration(hintText: 'Search radionuclide', isDense: true, border: InputBorder.none),
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: ink1),
+                                onFieldSubmitted: (_) => onSub(),
+                              ),
+                              optionsViewBuilder: (ctx, onSel, options) => Align(
+                                alignment: Alignment.topLeft,
+                                child: Material(
+                                  elevation: 4,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: SizedBox(
+                                    width: constraints.maxWidth,
+                                    height: 200,
+                                    child: ListView.builder(
+                                      padding: EdgeInsets.zero,
+                                      itemCount: options.length,
+                                      itemBuilder: (_, i) {
+                                        final opt = options.elementAt(i);
+                                        return ListTile(
+                                          dense: true,
+                                          title: Text(opt),
+                                          subtitle: Text('DAC: ${(NuclideData.dacValues[opt] ?? 0.0).toStringAsExponential(2)}'),
+                                          onTap: () => onSel(opt),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )),
+                          )),
+                          // Fraction
+                          Expanded(flex: 2, child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: TextFormField(
+                              initialValue: item.fraction.toString(),
+                              decoration: const InputDecoration(isDense: true, border: InputBorder.none),
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(fontSize: 13, color: ink1),
+                              onChanged: (v) => updateFraction(idx, v),
+                            ),
+                          )),
+                          // DAC display
+                          Expanded(flex: 2, child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(
+                              item.dac > 0 ? item.dac.toStringAsExponential(2) : '—',
+                              style: TextStyle(fontSize: 12, fontFamily: 'monospace', color: ink3),
+                            ),
+                          )),
+                          // Remove
+                          SizedBox(width: 36, child: IconButton(
+                            icon: Icon(Icons.remove_circle_outline, size: 16, color: _danger),
+                            onPressed: () => removeNuclideRow(idx),
+                            padding: EdgeInsets.zero,
+                          )),
+                        ]),
+                      );
+                    }).toList(),
                   ]),
                 ),
-              ),
-            ]),
-            const SizedBox(height: 10),
-            Table(
-              columnWidths: const {0: FlexColumnWidth(2), 1: FlexColumnWidth(1), 2: FlexColumnWidth(1), 3: FixedColumnWidth(40)},
-              border: TableBorder.all(color: borderColor, borderRadius: BorderRadius.circular(8)),
-              defaultVerticalAlignment: TableCellVerticalAlignment.middle,
-              children: [
-                TableRow(
-                  decoration: BoxDecoration(color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7)),
-                  children: [
-                    Padding(padding: const EdgeInsets.all(10), child: Text('Nuclide', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700))),
-                    Padding(padding: const EdgeInsets.all(10), child: Text('Fraction', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700))),
-                    Padding(padding: const EdgeInsets.all(10), child: Text('DAC (µCi/mL)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: isDark ? Colors.grey.shade300 : Colors.grey.shade700))),
-                    const SizedBox(),
-                  ],
-                ),
-                ...sourceTerm.asMap().entries.map((entry) {
-                  final idx = entry.key;
-                  final item = entry.value;
-                  return TableRow(key: item.key, children: [
-                    Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: LayoutBuilder(builder: (ctx, constraints) => RawAutocomplete<String>(
-                        textEditingController: item.nameController,
-                        focusNode: FocusNode(),
-                        optionsBuilder: (tv) {
-                          if (NuclideData.dacValues.containsKey(tv.text) && item.name != tv.text) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) => updateNuclide(idx, tv.text));
-                          }
-                          return tv.text.isEmpty ? NuclideData.dacValues.keys : NuclideData.dacValues.keys.where((o) => o.toLowerCase().contains(tv.text.toLowerCase()));
-                        },
-                        onSelected: (s) => updateNuclide(idx, s),
-                        fieldViewBuilder: (ctx, ctrl, fn, onSub) => TextFormField(
-                          controller: ctrl,
-                          focusNode: fn,
-                          decoration: const InputDecoration(hintText: 'Search radionuclide'),
-                          onFieldSubmitted: (_) => onSub(),
-                        ),
-                        optionsViewBuilder: (ctx, onSel, options) => Align(
-                          alignment: Alignment.topLeft,
-                          child: Material(
-                            elevation: 4,
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: constraints.maxWidth,
-                              height: 200,
-                              child: ListView.builder(
-                                padding: EdgeInsets.zero,
-                                itemCount: options.length,
-                                itemBuilder: (_, i) {
-                                  final opt = options.elementAt(i);
-                                  return ListTile(dense: true, title: Text(opt), subtitle: Text('DAC: ${(NuclideData.dacValues[opt] ?? 0.0).toStringAsExponential(2)}'), onTap: () => onSel(opt));
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                      )),
+                const SizedBox(height: 8),
+                // Fraction validation
+                if (fractionError)
+                  Row(children: [
+                    const Icon(Icons.warning_amber_rounded, color: _warn, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Fractions sum to ${totalFraction.toStringAsFixed(3)} (should be 1.000)',
+                      style: const TextStyle(fontSize: 12, color: _warn, fontWeight: FontWeight.w600)),
+                  ])
+                else if (sourceTerm.isNotEmpty)
+                  Row(children: [
+                    const Icon(Icons.check_circle_outline, color: _ok, size: 14),
+                    const SizedBox(width: 6),
+                    Text('Fractions sum to ${totalFraction.toStringAsFixed(3)} ✓',
+                      style: const TextStyle(fontSize: 12, color: _ok, fontWeight: FontWeight.w600)),
+                  ]),
+              ]),
+            ),
+
+            // ── 03 Release & room parameters ─────────────────────────────
+            sectionCard(
+              sectionNum: '03',
+              title: 'Release & room parameters',
+              child: Column(children: [
+                // Physical form pills + fr
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Physical form', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 6),
+                    pillSelect<PhysicalFormType>(
+                      options: physicalFormTypes,
+                      selected: selectedForm,
+                      label: (p) => p.name,
+                      sublabel: (p) => 'fr=${p.defaultFr}',
+                      onTap: onPhysicalFormChanged,
                     ),
-                    Padding(padding: const EdgeInsets.all(6), child: TextFormField(
-                      initialValue: item.fraction.toString(),
-                      decoration: const InputDecoration(),
+                  ])),
+                  const SizedBox(width: 16),
+                  SizedBox(width: 130, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Release fraction (fr)', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: frController,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        errorText: frError ? 'Out of range' : null,
+                      ),
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      onChanged: (v) => updateFraction(idx, v),
-                    )),
-                    Padding(padding: const EdgeInsets.all(10), child: Text(item.dac.toStringAsExponential(2), style: const TextStyle(fontSize: 12))),
-                    IconButton(icon: const Icon(Icons.remove_circle_outline, size: 18, color: danger), onPressed: () => removeNuclideRow(idx)),
-                  ]);
-                }).toList(),
+                      onChanged: (_) => calculate(),
+                    ),
+                    if (selectedForm != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: Text('Range ${selectedForm!.minFr}–${selectedForm!.maxFr}',
+                          style: TextStyle(fontSize: 10, color: ink4)),
+                      ),
+                  ])),
+                ]),
+                const SizedBox(height: 14),
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Escape fraction (fa)', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: faController,
+                      decoration: InputDecoration(isDense: true, errorText: faError ? 'Out of range' : null),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculate(),
+                    ),
+                    if (selectedConfinement != null)
+                      Padding(padding: const EdgeInsets.only(top: 3),
+                        child: Text('Range ${selectedConfinement!.minFa}–${selectedConfinement!.maxFa}',
+                          style: TextStyle(fontSize: 10, color: ink4))),
+                  ])),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Room volume (cm³)', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: volumeController,
+                      decoration: const InputDecoration(isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculate(),
+                    ),
+                  ])),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Mixing factor (λv)', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: mixingController,
+                      decoration: const InputDecoration(isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculate(),
+                    ),
+                  ])),
+                ]),
+              ]),
+            ),
+
+            // ── 04 Bioassay PIF factors ───────────────────────────────────
+            sectionCard(
+              sectionNum: '04',
+              title: 'Bioassay PIF factors',
+              hint: 'R × C × D × O × S × U × 10⁻⁶',
+              child: Column(children: [
+                _PifPillRow(
+                  label: 'Release (R)',
+                  options: pifReleaseTypes,
+                  selected: selectedPifRelease,
+                  label_: (e) => e.name,
+                  sublabel: (e) => '${e.value}',
+                  onTap: (e) { setState(() => selectedPifRelease = e); calculate(); },
+                  surface3: surface3, cardBorder: cardBorder, ink2: ink2, ink3: ink3, ink4: ink4,
+                ),
+                const SizedBox(height: 10),
+                _PifPillRow(
+                  label: 'Occupancy (O)',
+                  options: occupancyTypes,
+                  selected: selectedOccupancy,
+                  label_: (e) => e.name,
+                  sublabel: (e) => '${e.value}',
+                  onTap: (e) { setState(() => selectedOccupancy = e); calculate(); },
+                  surface3: surface3, cardBorder: cardBorder, ink2: ink2, ink3: ink3, ink4: ink4,
+                ),
+                const SizedBox(height: 10),
+                _PifPillRow(
+                  label: 'Dispersibility (D)',
+                  options: dispersibilityTypes,
+                  selected: selectedDispersibility,
+                  label_: (e) => e.name,
+                  sublabel: (e) => '${e.value}',
+                  onTap: (e) { setState(() => selectedDispersibility = e); calculate(); },
+                  surface3: surface3, cardBorder: cardBorder, ink2: ink2, ink3: ink3, ink4: ink4,
+                ),
+                const SizedBox(height: 10),
+                _PifPillRow(
+                  label: 'Special form (S)',
+                  options: specialFormTypes,
+                  selected: selectedSpecialForm,
+                  label_: (e) => e.name,
+                  sublabel: (e) => '${e.value}',
+                  onTap: (e) { setState(() => selectedSpecialForm = e); calculate(); },
+                  surface3: surface3, cardBorder: cardBorder, ink2: ink2, ink3: ink3, ink4: ink4,
+                ),
+                const SizedBox(height: 12),
+                Row(children: [
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Uncertainty (U)', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    TextField(
+                      controller: uncertaintyController,
+                      decoration: const InputDecoration(isDense: true),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (_) => calculate(),
+                    ),
+                  ])),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Confinement (C) — from above', style: TextStyle(fontSize: 11, color: ink3)),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: surface3,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(color: cardBorder),
+                      ),
+                      child: Text(
+                        selectedConfinement?.pifC.toString() ?? '—',
+                        style: TextStyle(fontSize: 13, fontFamily: 'monospace', color: ink3),
+                      ),
+                    ),
+                  ])),
+                ]),
+              ]),
+            ),
+          ]),
+        ),
+      ),
+
+      // ── RIGHT: live assessment side panel (380px) ──────────────────────
+      Container(
+        width: 380,
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1A1A18) : const Color(0xFFFAF9F7),
+          border: Border(left: BorderSide(color: cardBorder)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Panel header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: cardBorder))),
+            child: Row(children: [
+              Text('Assessment', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: ink1)),
+              const Spacer(),
+              Container(width: 7, height: 7,
+                decoration: const BoxDecoration(color: _ok, shape: BoxShape.circle)),
+              const SizedBox(width: 5),
+              Text('LIVE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _ok, letterSpacing: 0.5)),
+            ]),
+          ),
+
+          Expanded(child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+              // ── Big metric: containment sum-of-fractions ──────────────
+              _BigMetric(
+                label: 'Containment sum-of-fractions',
+                value: calculatedResult != null ? calculatedResult!.toStringAsExponential(2) : '—',
+                badge: calculatedResult == null ? null : (isSufficient! ? 'Sufficient' : 'Insufficient'),
+                badgeOk: isSufficient ?? true,
+                sub: 'Threshold 2×10⁻²',
+                isOk: isSufficient ?? true,
+                cardBg: cardBg, cardBorder: cardBorder, ink1: ink1, ink3: ink3, ink4: ink4,
+              ),
+              const SizedBox(height: 10),
+
+              // ── Big metric: bioassay ──────────────────────────────────
+              _BigMetric(
+                label: 'Bioassay requirement',
+                value: bioassayRequired == null ? '—' : (bioassayRequired! ? 'Required' : 'Not required'),
+                badge: null,
+                badgeOk: !(bioassayRequired ?? false),
+                sub: bioassayThreshold != null && bioassayThreshold! > 0
+                  ? 'Threshold ${bioassayThreshold!.toStringAsExponential(2)} µCi'
+                  : 'Threshold —',
+                isOk: !(bioassayRequired ?? false),
+                cardBg: cardBg, cardBorder: cardBorder, ink1: ink1, ink3: ink3, ink4: ink4,
+              ),
+              const SizedBox(height: 16),
+
+              // ── Inputs summary ────────────────────────────────────────
+              Text('Inputs', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: ink4, letterSpacing: 0.5)),
+              const SizedBox(height: 8),
+              _MetricRow(
+                label: 'Effective activity',
+                value: totalActivityController.text.isNotEmpty ? '${double.tryParse(totalActivityController.text)?.toStringAsExponential(2) ?? "—"} µCi' : '—',
+                ink1: ink1, ink3: ink3,
+              ),
+              Divider(height: 1, color: cardBorder),
+              _MetricRow(
+                label: 'PIF',
+                value: pifResult != null ? pifResult!.toStringAsExponential(2) : '—',
+                ink1: ink1, ink3: ink3,
+              ),
+              Divider(height: 1, color: cardBorder),
+              _MetricRow(
+                label: 'Σ fraction / ALI',
+                value: calculatedResult != null ? (() {
+                  double sumRisk = 0.0;
+                  for (final e in sourceTerm) {
+                    if (e.dac <= 0) continue;
+                    final ali = e.dac * 2.4e9;
+                    if (ali > 0) sumRisk += e.fraction / ali;
+                  }
+                  return sumRisk.toStringAsExponential(2);
+                })() : '—',
+                ink1: ink1, ink3: ink3,
+              ),
+              const SizedBox(height: 16),
+
+              // ── Per-nuclide contributions ─────────────────────────────
+              if (nuclideContribs.isNotEmpty) ...[
+                Text('Per-nuclide contribution', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: ink4, letterSpacing: 0.5)),
+                const SizedBox(height: 10),
+                ...nuclideContribs.map((n) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Row(children: [
+                      Text(n.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: ink1, fontFamily: 'monospace')),
+                      const Spacer(),
+                      Text(n.contrib.toStringAsExponential(2), style: TextStyle(fontSize: 11, color: ink3, fontFamily: 'monospace')),
+                    ]),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: n.pct / 100,
+                        minHeight: 4,
+                        backgroundColor: cardBorder,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          (isSufficient ?? true) ? _accent : _danger,
+                        ),
+                      ),
+                    ),
+                  ]),
+                )).toList(),
               ],
-            ),
-            if (fractionError)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Row(children: [
-                  const Icon(Icons.warning_amber, color: warning, size: 14),
-                  const SizedBox(width: 6),
-                  Text('Fractions sum to ${totalFraction.toStringAsFixed(3)} (should be 1.0)', style: const TextStyle(fontSize: 12, color: warning, fontWeight: FontWeight.w600)),
-                ]),
-              ),
-          ]),
-        ),
+            ]),
+          )),
+        ]),
+      ),
+    ]);
+  }
+}
 
-        // 3. Containment Assessment
-        card(
-          title: '3. Containment Assessment',
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Expanded(flex: 2, child: DropdownButtonFormField<PhysicalFormType>(
-                value: selectedForm,
-                decoration: const InputDecoration(labelText: 'Physical Form'),
-                items: physicalFormTypes.map((e) => DropdownMenuItem(value: e, child: Text(e.name))).toList(),
-                onChanged: onPhysicalFormChanged,
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                TextField(
-                  controller: frController,
-                  decoration: InputDecoration(labelText: 'Release Frac (fr)', errorText: frError ? 'Out of range' : null),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => calculate(),
-                ),
-                if (selectedForm != null)
-                  Padding(padding: const EdgeInsets.only(top: 3, left: 2), child: Text('Range: ${selectedForm!.minFr} – ${selectedForm!.maxFr}', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600))),
-              ])),
-            ]),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                TextField(
-                  controller: faController,
-                  decoration: InputDecoration(labelText: 'Escape Frac (fa)', errorText: faError ? 'Out of range' : null),
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (_) => calculate(),
-                ),
-                if (selectedConfinement != null)
-                  Padding(padding: const EdgeInsets.only(top: 3, left: 2), child: Text('Range: ${selectedConfinement!.minFa} – ${selectedConfinement!.maxFa}', style: TextStyle(fontSize: 11, color: isDark ? Colors.grey.shade500 : Colors.grey.shade600))),
-              ])),
-              const SizedBox(width: 12),
-              Expanded(child: TextField(controller: volumeController, decoration: const InputDecoration(labelText: 'Room Volume (cm³)'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculate())),
-            ]),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: TextField(controller: mixingController, decoration: const InputDecoration(labelText: 'Mixing Factor (λv)'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculate())),
-              const SizedBox(width: 12),
-              Expanded(child: TextField(controller: uncertaintyController, decoration: const InputDecoration(labelText: 'Uncertainty'), keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => calculate())),
-            ]),
-            if (calculatedResult != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: (isSufficient! ? accentAlt : danger).withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: (isSufficient! ? accentAlt : danger).withOpacity(0.3)),
-                ),
-                child: Row(children: [
-                  Icon(isSufficient! ? Icons.check_circle_outline : Icons.warning_amber_outlined, color: isSufficient! ? accentAlt : danger, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(isSufficient! ? 'Containment Sufficient' : 'Containment NOT Sufficient', style: TextStyle(fontWeight: FontWeight.w700, color: isSufficient! ? accentAlt : danger)),
-                    Text('Value: ${calculatedResult!.toStringAsExponential(3)} (limit: 0.02)', style: TextStyle(fontSize: 12, color: isSufficient! ? accentAlt : danger)),
-                  ])),
-                ]),
-              ),
-            ],
-          ]),
-        ),
+// ── Helper widgets ─────────────────────────────────────────────────────────
 
-        // 4. Bioassay Assessment
-        card(
-          title: '4. Bioassay Assessment',
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            TextFormField(
-              initialValue: selectedConfinement?.pifC.toString() ?? '',
-              readOnly: true,
-              decoration: const InputDecoration(labelText: 'Confinement Factor (C) — from selection above'),
+class _PillToggle extends StatelessWidget {
+  final List<String> options;
+  final int selectedIndex;
+  final void Function(int) onChanged;
+  final Color accent, surface3, cardBorder, ink2;
+
+  const _PillToggle({
+    required this.options, required this.selectedIndex, required this.onChanged,
+    required this.accent, required this.surface3, required this.cardBorder, required this.ink2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(color: surface3, borderRadius: BorderRadius.circular(7), border: Border.all(color: cardBorder)),
+      child: Row(mainAxisSize: MainAxisSize.min, children: options.asMap().entries.map((e) {
+        final selected = e.key == selectedIndex;
+        return GestureDetector(
+          onTap: () => onChanged(e.key),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            margin: const EdgeInsets.all(3),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: selected ? accent : Colors.transparent,
+              borderRadius: BorderRadius.circular(5),
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<PifReleaseType>(
-              value: selectedPifRelease,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Release Factor (R)'),
-              items: pifReleaseTypes.map((e) => DropdownMenuItem(value: e, child: Text('${e.name} (${e.value})', overflow: TextOverflow.ellipsis))).toList(),
-              onChanged: (v) { setState(() => selectedPifRelease = v); calculate(); },
+            child: Text(e.value,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : ink2)),
+          ),
+        );
+      }).toList()),
+    );
+  }
+}
+
+class _PifPillRow<T> extends StatelessWidget {
+  final String label;
+  final List<T> options;
+  final T? selected;
+  final String Function(T) label_;
+  final String Function(T) sublabel;
+  final void Function(T) onTap;
+  final Color surface3, cardBorder, ink2, ink3, ink4;
+
+  const _PifPillRow({
+    required this.label, required this.options, required this.selected,
+    required this.label_, required this.sublabel, required this.onTap,
+    required this.surface3, required this.cardBorder, required this.ink2,
+    required this.ink3, required this.ink4,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: TextStyle(fontSize: 11, color: ink3)),
+      const SizedBox(height: 5),
+      Wrap(spacing: 5, runSpacing: 5, children: options.map((o) {
+        final isSelected = selected == o;
+        return GestureDetector(
+          onTap: () => onTap(o),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+            decoration: BoxDecoration(
+              color: isSelected ? ContainmentTabState._accent : surface3,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: isSelected ? ContainmentTabState._accent : cardBorder),
             ),
-            const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: DropdownButtonFormField<OccupancyType>(
-                value: selectedOccupancy,
-                decoration: const InputDecoration(labelText: 'Occupancy (O)'),
-                items: occupancyTypes.map((e) => DropdownMenuItem(value: e, child: Text('${e.name} (${e.value})', overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (v) { setState(() => selectedOccupancy = v); calculate(); },
-              )),
-              const SizedBox(width: 12),
-              Expanded(child: DropdownButtonFormField<DispersibilityType>(
-                value: selectedDispersibility,
-                decoration: const InputDecoration(labelText: 'Dispersibility (D)'),
-                items: dispersibilityTypes.map((e) => DropdownMenuItem(value: e, child: Text('${e.name} (${e.value})', overflow: TextOverflow.ellipsis))).toList(),
-                onChanged: (v) { setState(() => selectedDispersibility = v); calculate(); },
-              )),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(label_(o), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : ink2)),
+              const SizedBox(width: 4),
+              Text(sublabel(o), style: TextStyle(fontSize: 10,
+                color: isSelected ? Colors.white.withOpacity(0.7) : ink4)),
             ]),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<SpecialFormType>(
-              value: selectedSpecialForm,
-              decoration: const InputDecoration(labelText: 'Special Form (S)'),
-              items: specialFormTypes.map((e) => DropdownMenuItem(value: e, child: Text('${e.name} (${e.value})'))).toList(),
-              onChanged: (v) { setState(() => selectedSpecialForm = v); calculate(); },
+          ),
+        );
+      }).toList()),
+    ]);
+  }
+}
+
+class _BigMetric extends StatelessWidget {
+  final String label, value;
+  final String? badge, sub;
+  final bool badgeOk, isOk;
+  final Color cardBg, cardBorder, ink1, ink3, ink4;
+
+  const _BigMetric({
+    required this.label, required this.value,
+    this.badge, this.sub, required this.badgeOk, required this.isOk,
+    required this.cardBg, required this.cardBorder,
+    required this.ink1, required this.ink3, required this.ink4,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = isOk ? ContainmentTabState._ok : ContainmentTabState._danger;
+    final statusWash  = isOk ? ContainmentTabState._okWash : ContainmentTabState._dangerWash;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: cardBorder),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: TextStyle(fontSize: 11, color: ink4)),
+        const SizedBox(height: 6),
+        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700,
+          fontFamily: 'monospace', color: ink1, letterSpacing: -0.5)),
+        const SizedBox(height: 8),
+        Row(children: [
+          if (badge != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: statusWash, borderRadius: BorderRadius.circular(4)),
+              child: Text(badge!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
             ),
-            if (bioassayRequired != null) ...[
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: (!bioassayRequired! ? accentAlt : warning).withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: (!bioassayRequired! ? accentAlt : warning).withOpacity(0.3)),
-                ),
-                child: Row(children: [
-                  Icon(!bioassayRequired! ? Icons.check_circle_outline : Icons.warning_amber_outlined, color: !bioassayRequired! ? accentAlt : warning, size: 22),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(bioassayRequired! ? 'Routine Bioassay Required' : 'Routine Bioassay Not Required', style: TextStyle(fontWeight: FontWeight.w700, color: !bioassayRequired! ? accentAlt : warning)),
-                    Text('Threshold: ${bioassayThreshold!.toStringAsExponential(3)} µCi', style: TextStyle(fontSize: 12, color: !bioassayRequired! ? accentAlt : warning)),
-                  ])),
-                ]),
-              ),
-            ],
-          ]),
-        ),
+          if (badge != null) const SizedBox(width: 8),
+          if (sub != null)
+            Text(sub!, style: TextStyle(fontSize: 11, color: ink4)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _MetricRow extends StatelessWidget {
+  final String label, value;
+  final Color ink1, ink3;
+
+  const _MetricRow({required this.label, required this.value, required this.ink1, required this.ink3});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(children: [
+        Text(label, style: TextStyle(fontSize: 12, color: ink3)),
+        const Spacer(),
+        Text(value, style: TextStyle(fontSize: 12, fontFamily: 'monospace', fontWeight: FontWeight.w600, color: ink1)),
       ]),
     );
   }

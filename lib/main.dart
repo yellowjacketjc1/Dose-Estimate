@@ -543,8 +543,8 @@ class _CollapsibleSection extends StatelessWidget {
           title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
           initiallyExpanded: initiallyExpanded,
           onExpansionChanged: onExpansionChanged,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
           children: [child],
         ),
@@ -3432,8 +3432,8 @@ class _TaskRightRail extends StatelessWidget {
     final collPct = (collEff / 750).clamp(0.0, 1.0);
     final collLevel = collEff > 750 ? 'danger' : collEff > 400 ? 'warn' : 'ok';
 
-    final dacFrac = totals['totalDacFractionWithResp']!;
-    final dacHrs = dacFrac * task.hours;
+    final protectedDacFrac = totals['totalDacFractionWithResp']!;
+    final dacHrs = protectedDacFrac * task.hours;
     final dacPct = (dacHrs / 40).clamp(0.0, 1.0);
     final dacLevel = dacHrs > 200 ? 'danger' : dacHrs > 40 ? 'warn' : 'ok';
 
@@ -3564,12 +3564,12 @@ class _TaskRightRail extends StatelessWidget {
           group('Intake & Airborne', [
             metric('mPIF', totals['mPIF']! == 0 ? '—' : totals['mPIF']!.toStringAsExponential(2), big: true),
             metric('Σ DAC fraction (eng only)', formatNumber(totals['totalDacFractionEngOnly'] ?? 0.0)),
-            metric('Σ DAC fraction (w/ resp)', formatNumber(totals['totalDacFractionWithResp'] ?? 0.0)),
-            metric('DAC-hours (post-resp)', formatNumber(dacHrs), unit: 'DAC-hr', level: dacLevel),
+            metric('Internal dose (after resp)', formatNumber(indivInt), unit: 'mrem', level: indivLevel),
+            metric('Protected DAC-hours', formatNumber(dacHrs), unit: 'DAC-hr', level: dacLevel),
             const SizedBox(height: 4),
             progressBar(dacPct, dacLevel),
             const SizedBox(height: 4),
-            Text('Sampling threshold: 40 DAC-hr/yr', style: TextStyle(fontSize: 11, color: ink3)),
+            Text('Sampling threshold: 40 DAC-hr/yr on protected intake basis', style: TextStyle(fontSize: 11, color: ink3)),
           ]),
 
           // Extremity
