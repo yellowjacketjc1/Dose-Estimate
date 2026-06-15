@@ -8,8 +8,8 @@ class NuclideData {
     "Ag-108m": 2e-8, // (S)
     "Ag-110m": 7e-8, // (S)
     "Al-26": 4e-8, // (F/M)
-    "Am-241": 5e-12,
-    "Am-243": 5e-12,
+    "Am-241": 5e-12, // (Y) per 10 CFR 835 Appendix A
+    "Am-243": 5e-12, // (Y) per 10 CFR 835 Appendix A
     "Ar-37": 3.0, // (Immersion)
     "Ar-39": 1e-3, // (Immersion)
     "Ar-41": 3e-6, // (Immersion)

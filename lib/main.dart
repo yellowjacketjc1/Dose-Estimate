@@ -1000,6 +1000,29 @@ class _WorkDivider extends StatelessWidget {
   }
 }
 
+// Blocks typing a leading minus sign; paste of negative values is caught at the
+// widget level by comparing the parsed result against zero.
+class _NonNegativeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Allow empty / in-progress entry (e.g. "1e-", "1.") but block a bare "-"
+    if (newValue.text.startsWith('-')) return oldValue;
+    return newValue;
+  }
+}
+
+// Returns an InputDecoration with error styling when [isNegative] is true.
+InputDecoration _numericDecoration(InputDecoration base, bool isNegative) {
+  if (!isNegative) return base;
+  return base.copyWith(
+    errorText: 'Must be ≥ 0',
+    errorStyle: const TextStyle(fontSize: 11),
+  );
+}
+
 class DoseEstimateScreen extends StatefulWidget {
   final VoidCallback? onTaskCountChanged;
   final GlobalKey<ContainmentTabState>? containmentKey;
@@ -1020,7 +1043,7 @@ class TaskData {
   String location;
   int workers;
   double hours;
-  double mpifR;
+  double? mpifR; // null = not yet selected; 0.0 = encapsulated (R=0 is a valid selection)
   double mpifC;
   double mpifD;
   double mpifO;
@@ -1051,8 +1074,8 @@ class TaskData {
     this.location = '',
     this.workers = 1,
     this.hours = 1.0,
-    // Use 0.0 to indicate 'not selected' for all mPIF inputs. UI will require selection before computing mPIF.
-    this.mpifR = 0.0,
+    // null = not yet selected; 0.0 = encapsulated (R=0 explicitly chosen). UI requires selection before computing mPIF.
+    this.mpifR,
     this.mpifC = 0.0,
     this.mpifD = 0.0,
     this.mpifO = 1.0,
@@ -1163,7 +1186,7 @@ class TaskData {
       workers: j['workers'] ?? 1,
       hours: (j['hours'] ?? 1).toDouble(),
       // Use 0.0 when values are missing so mPIF remains "not set" until user selects factors.
-      mpifR: (j['mpifR'] ?? 0).toDouble(),
+      mpifR: j['mpifR'] != null ? (j['mpifR'] as num).toDouble() : null,
       mpifC: (j['mpifC'] ?? 0).toDouble(),
       mpifD: (j['mpifD'] ?? 0).toDouble(),
       mpifO: 1.0, // fixed — occupancy is always 1 for dose estimate tasks
@@ -1535,7 +1558,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
 
   double computeMPIF(TaskData t) {
     // require all mPIF factors to be selected (non-zero) before computing
-    if (t.mpifR <= 0.0 ||
+    if (t.mpifR == null ||
         t.mpifC <= 0.0 ||
         t.mpifD <= 0.0 ||
         t.mpifS <= 0.0 ||
@@ -1545,7 +1568,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     // ensure all multipliers are treated as doubles and avoid integer-only arithmetic
     final mPIF =
         1e-6 *
-        (t.mpifR) *
+        (t.mpifR!) *
         (t.mpifC) *
         (t.mpifD) *
         (t.mpifO) *
@@ -2179,7 +2202,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       return 'PFE must be one of ${_allowedPfeValues.toList()..sort()} (got ${t.pfe}).';
     }
 
-    if (!_isAllowedDouble(t.mpifR, _allowedMpifRValues)) {
+    if (t.mpifR != null && !_isAllowedDouble(t.mpifR!, _allowedMpifRValues)) {
       return 'mPIF Release Factor (R) must be one of ${_allowedMpifRValues.toList()..sort()} (got ${t.mpifR}).';
     }
     if (!_isAllowedDouble(t.mpifC, _allowedMpifCValues)) {
@@ -3486,7 +3509,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                         for (final e in [
                                           {
                                             'l': 'R (release)',
-                                            'v': t.mpifR.toString(),
+                                            'v': t.mpifR?.toString() ?? '—',
                                           },
                                           {
                                             'l': 'C (confinement)',
@@ -5388,8 +5411,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         child: TextField(
                           controller: t.workersController,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            labelText: '# Workers',
+                          inputFormatters: [_NonNegativeFormatter()],
+                          decoration: _numericDecoration(
+                            const InputDecoration(labelText: '# Workers'),
+                            (int.tryParse(t.workersController.text) ?? 0) < 0,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -5401,8 +5426,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          decoration: const InputDecoration(
-                            labelText: 'Hours Each',
+                          inputFormatters: [_NonNegativeFormatter()],
+                          decoration: _numericDecoration(
+                            const InputDecoration(labelText: 'Hours Each'),
+                            (double.tryParse(t.hoursController.text) ?? 0) < 0,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -5430,7 +5457,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<double>(
-                              value: t.mpifR > 0.0 ? t.mpifR : null,
+                              value: t.mpifR,
                               decoration: const InputDecoration(
                                 labelText: 'Release Factor (R)',
                                 hintText: 'Select R',
@@ -5444,7 +5471,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   )
                                   .toList(),
                               onChanged: (v) {
-                                t.mpifR = v ?? 0.0;
+                                t.mpifR = v;
                                 setState(() {});
                               },
                             ),
@@ -5590,8 +5617,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
                         ),
-                        decoration: const InputDecoration(
-                          labelText: 'Dose Rate (mrem/hr)',
+                        inputFormatters: [_NonNegativeFormatter()],
+                        decoration: _numericDecoration(
+                          const InputDecoration(labelText: 'Dose Rate (mrem/hr)'),
+                          (double.tryParse(t.doseRateController.text) ?? 0) < 0,
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -5603,6 +5632,18 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               label: 'Person-Hours',
                               value: totals['personHours']!.toStringAsFixed(2),
                               color: _kOk,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _MiniStat(
+                              label: 'Individual External',
+                              value: (t.workers > 0
+                                      ? totals['collectiveExternal']! / t.workers
+                                      : 0.0)
+                                  .toStringAsFixed(2),
+                              unit: 'mrem/person',
+                              color: _kAccent,
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -5674,14 +5715,34 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                     e.nuclide = s;
                                     setState(() {});
                                   },
-                                  fieldViewBuilder: (ctx, ctrl, fn, _) {
+                                  fieldViewBuilder: (ctx, ctrl, fn, onFieldSubmitted) {
                                     ctrl.text = e.nuclide ?? '';
+                                    final all = [
+                                      'Other',
+                                      'Various',
+                                      ...NuclideData.dacValues.keys,
+                                    ];
+                                    void commitTopMatch() {
+                                      final query = ctrl.text.trim();
+                                      if (query.isEmpty) return;
+                                      final matches = all.where(
+                                        (k) => k.toLowerCase().contains(query.toLowerCase()),
+                                      );
+                                      if (matches.isNotEmpty) {
+                                        e.nuclide = matches.first;
+                                        ctrl.text = matches.first;
+                                        onFieldSubmitted();
+                                        setState(() {});
+                                      }
+                                    }
                                     return TextField(
                                       controller: ctrl,
                                       focusNode: fn,
                                       decoration: const InputDecoration(
                                         hintText: 'Nuclide',
                                       ),
+                                      onSubmitted: (_) => commitTopMatch(),
+                                      onEditingComplete: commitTopMatch,
                                     );
                                   },
                                 ),
@@ -5690,8 +5751,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               Expanded(
                                 child: TextField(
                                   controller: e.doseRateController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Dose Rate (mrem/hr)',
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [_NonNegativeFormatter()],
+                                  decoration: _numericDecoration(
+                                    const InputDecoration(labelText: 'Dose Rate (mrem/hr)'),
+                                    (double.tryParse(e.doseRateController.text) ?? 0) < 0,
                                   ),
                                   onChanged: (v) => setState(() {
                                     e.doseRate = double.tryParse(v) ?? 0.0;
@@ -5702,8 +5766,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               Expanded(
                                 child: TextField(
                                   controller: e.timeController,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Time (hr)',
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: [_NonNegativeFormatter()],
+                                  decoration: _numericDecoration(
+                                    const InputDecoration(labelText: 'Time (hr)'),
+                                    (double.tryParse(e.timeController.text) ?? 0) < 0,
                                   ),
                                   onChanged: (v) => setState(() {
                                     e.time = double.tryParse(v) ?? 0.0;
@@ -5910,73 +5977,105 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                             Row(
                               children: [
                                 Expanded(
-                                  child: Autocomplete<String>(
-                                    initialValue: TextEditingValue(
-                                      text: n.name ?? '',
-                                    ),
-                                    optionsBuilder: (v) => v.text.isEmpty
-                                        ? NuclideData.dacValues.keys
-                                        : NuclideData.dacValues.keys.where(
-                                            (k) => k.toLowerCase().contains(
-                                              v.text.toLowerCase(),
-                                            ),
-                                          ),
-                                    optionsViewBuilder:
-                                        (ctx, onSelected, options) => Material(
-                                          elevation: 4,
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxHeight: 200,
-                                            ),
-                                            child: ListView.builder(
-                                              padding: EdgeInsets.zero,
-                                              itemCount: options.length,
-                                              itemBuilder: (_, i) {
-                                                final opt = options.elementAt(
-                                                  i,
-                                                );
-                                                final d =
-                                                    NuclideData
-                                                        .dacValues[opt] ??
-                                                    1e-12;
-                                                return ListTile(
-                                                  dense: true,
-                                                  title: Text(opt),
-                                                  subtitle: opt == 'Other'
-                                                      ? const Text('Custom DAC')
-                                                      : Text(
-                                                          'DAC: ${formatNumber(d)}',
-                                                        ),
-                                                  onTap: () => onSelected(opt),
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                    onSelected: (s) {
-                                      n.name = s;
-                                      if (s != 'Other') {
-                                        n.customDAC = null;
-                                        n.dacController.clear();
+                                  child: Focus(
+                                    // When focus leaves the entire autocomplete
+                                    // subtree (field + dropdown), revert the
+                                    // displayed text to the last confirmed name.
+                                    onFocusChange: (hasFocus) {
+                                      if (!hasFocus) {
+                                        setState(() {});
                                       }
-                                      setState(() {});
                                     },
-                                    fieldViewBuilder: (ctx, ctrl, fn, _) {
-                                      ctrl.text = n.name ?? '';
-                                      return TextField(
-                                        controller: ctrl,
-                                        focusNode: fn,
-                                        decoration: const InputDecoration(
-                                          labelText: 'Nuclide',
-                                          hintText: 'Select radionuclide',
-                                        ),
-                                      );
-                                    },
+                                    child: Autocomplete<String>(
+                                      initialValue: TextEditingValue(
+                                        text: n.name ?? '',
+                                      ),
+                                      optionsBuilder: (v) => v.text.isEmpty
+                                          ? NuclideData.dacValues.keys
+                                          : NuclideData.dacValues.keys.where(
+                                              (k) => k.toLowerCase().contains(
+                                                v.text.toLowerCase(),
+                                              ),
+                                            ),
+                                      optionsViewBuilder:
+                                          (ctx, onSelected, options) => Material(
+                                            elevation: 4,
+                                            child: ConstrainedBox(
+                                              constraints: const BoxConstraints(
+                                                maxHeight: 200,
+                                              ),
+                                              child: ListView.builder(
+                                                padding: EdgeInsets.zero,
+                                                itemCount: options.length,
+                                                itemBuilder: (_, i) {
+                                                  final opt = options.elementAt(
+                                                    i,
+                                                  );
+                                                  final d =
+                                                      NuclideData
+                                                          .dacValues[opt] ??
+                                                      1e-12;
+                                                  return ListTile(
+                                                    dense: true,
+                                                    title: Text(opt),
+                                                    subtitle: opt == 'Other'
+                                                        ? const Text('Custom DAC')
+                                                        : Text(
+                                                            'DAC: ${formatNumber(d)}',
+                                                          ),
+                                                    onTap: () => onSelected(opt),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          ),
+                                      onSelected: (s) {
+                                        n.name = s;
+                                        if (s != 'Other') {
+                                          n.customDAC = null;
+                                          n.dacController.clear();
+                                        }
+                                        setState(() {});
+                                      },
+                                      fieldViewBuilder: (ctx, ctrl, fn, onFieldSubmitted) {
+                                        if (!fn.hasFocus) {
+                                          ctrl.text = n.name ?? '';
+                                        }
+                                        void commitTopMatch() {
+                                          final query = ctrl.text.trim();
+                                          if (query.isEmpty) return;
+                                          final matches = NuclideData.dacValues.keys.where(
+                                            (k) => k.toLowerCase().contains(query.toLowerCase()),
+                                          );
+                                          if (matches.isNotEmpty) {
+                                            n.name = matches.first;
+                                            if (matches.first != 'Other') { n.customDAC = null; n.dacController.clear(); }
+                                            ctrl.text = matches.first;
+                                            onFieldSubmitted();
+                                            setState(() {});
+                                          }
+                                        }
+                                        return TextField(
+                                          controller: ctrl,
+                                          focusNode: fn,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Nuclide',
+                                            hintText: 'Select radionuclide',
+                                          ),
+                                          onSubmitted: (_) => commitTopMatch(),
+                                          onEditingComplete: commitTopMatch,
+                                        );
+                                      },
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: TextField(
+                                    // Key forces rebuild when nuclide changes so
+                                    // the read-only display always shows the
+                                    // correct DAC for the selected nuclide.
+                                    key: ValueKey('dac_${n.name}_$ni'),
                                     controller: n.name == 'Other'
                                         ? n.dacController
                                         : TextEditingController(
@@ -5994,14 +6093,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                       FilteringTextInputFormatter.allow(
                                         RegExp(r'[0-9eE+\-\.]'),
                                       ),
+                                      _NonNegativeFormatter(),
                                     ],
-                                    decoration: InputDecoration(
-                                      labelText: 'DAC (µCi/mL)',
-                                      hintText: n.name == 'Other'
-                                          ? 'Enter custom DAC'
-                                          : (n.name == null
-                                                ? 'Select nuclide'
-                                                : ''),
+                                    decoration: _numericDecoration(
+                                      InputDecoration(
+                                        labelText: 'DAC (µCi/mL)',
+                                        hintText: n.name == 'Other'
+                                            ? 'Enter custom DAC'
+                                            : (n.name == null
+                                                  ? 'Select nuclide'
+                                                  : ''),
+                                      ),
+                                      n.name == 'Other' &&
+                                          (double.tryParse(n.dacController.text) ?? 0) < 0,
                                     ),
                                     onChanged: (_) => setState(() {}),
                                   ),
@@ -6018,9 +6122,13 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                       FilteringTextInputFormatter.allow(
                                         RegExp(r'[0-9eE+\-\.]'),
                                       ),
+                                      _NonNegativeFormatter(),
                                     ],
-                                    decoration: const InputDecoration(
-                                      labelText: 'Contam. (dpm/100cm²)',
+                                    decoration: _numericDecoration(
+                                      const InputDecoration(
+                                        labelText: 'Contam. (dpm/100cm²)',
+                                      ),
+                                      (double.tryParse(n.contamController.text) ?? 0) < 0,
                                     ),
                                     onChanged: (_) => setState(() {}),
                                   ),

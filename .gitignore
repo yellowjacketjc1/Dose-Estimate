@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local QA artifacts
+/742 QA/
+/test/qa_smoke_test.dart
