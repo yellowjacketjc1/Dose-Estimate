@@ -2631,10 +2631,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final wo = workOrderController.text.isNotEmpty
           ? workOrderController.text
-          : '—';
+          : '-';
       final dateStr = dateController.text.isNotEmpty
           ? dateController.text
-          : '—';
+          : '-';
       final descStr = descriptionController.text;
       final nTasks = tasks.length;
 
@@ -2677,8 +2677,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                           pw.SizedBox(height: 4),
                           pw.Text(
-                            '$wo  ·  $dateStr'
-                            '${descStr.isNotEmpty ? "  ·  $descStr" : ""}',
+                            '$wo  |  $dateStr'
+                            '${descStr.isNotEmpty ? "  |  $descStr" : ""}',
                             style: pw.TextStyle(
                               fontSize: 9.5,
                               color: _pdfNavyLight,
@@ -2699,8 +2699,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           pw.SizedBox(height: 3),
                           pw.Text(
                             '$nTasks ${nTasks == 1 ? "task" : "tasks"}'
-                            '  ·  $totalWorkers workers'
-                            '  ·  ${totalPersonHrs.toStringAsFixed(0)} person-hrs',
+                            '  |  $totalWorkers workers'
+                            '  |  ${totalPersonHrs.toStringAsFixed(0)} person-hrs',
                             style: pw.TextStyle(
                               fontSize: 9.5,
                               color: _pdfNavyMid,
@@ -3350,7 +3350,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     pw.TableRow(
                       children: [
                         pw.Text(
-                          'Task ${i + 1} of ${taskSummaries.length} — ${t.title}',
+                          'Task ${i + 1} of ${taskSummaries.length} - ${t.title}',
                           style: pw.TextStyle(
                             fontSize: 12,
                             fontWeight: pw.FontWeight.bold,
@@ -3360,7 +3360,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         pw.Align(
                           alignment: pw.Alignment.centerRight,
                           child: pw.Text(
-                            '$wo  ·  $dateStr',
+                            '$wo  |  $dateStr',
                             style: pw.TextStyle(
                               fontSize: 9,
                               color: _pdfNavyLight,
@@ -3389,7 +3389,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     pw.Text(
-                      '${t.title}  ·  ${t.location}',
+                      '${t.title}  |  ${t.location}',
                       style: pw.TextStyle(
                         fontSize: 14,
                         fontWeight: pw.FontWeight.bold,
@@ -3476,7 +3476,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         children: [
                           // ── mPIF ──────────────────────────────────────────
                           _pdfSectionLabel(
-                            'mPIF — Material Potential Intake Fraction',
+                            'mPIF - Material Potential Intake Fraction',
                           ),
                           pw.Container(
                             width: _pdfCW,
@@ -3509,7 +3509,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                         for (final e in [
                                           {
                                             'l': 'R (release)',
-                                            'v': t.mpifR?.toString() ?? '—',
+                                            'v': t.mpifR?.toString() ?? '-',
                                           },
                                           {
                                             'l': 'C (confinement)',
@@ -3556,7 +3556,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 ),
                                 pw.SizedBox(height: 6),
                                 pw.Text(
-                                  'Computed mPIF = 1×10⁻⁶ × R × C × D × O × S × U = ${formatNumber(mPIF)}',
+                                  'Computed mPIF = 1x10^-6 x R x C x D x O x S x U = ${formatNumber(mPIF)}',
                                   style: pw.TextStyle(
                                     fontSize: 9,
                                     fontWeight: pw.FontWeight.bold,
@@ -3597,10 +3597,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 pw.TableRow(
                                   children: [
                                     pw.Text(
-                                      '${t.doseRate} mrem/hr × ${t.hours.toStringAsFixed(1)} hr'
-                                      '${t.pfr > 1 ? " × 1.15 (resp. penalty)" : ""}'
+                                      '${t.doseRate} mrem/hr x ${t.hours.toStringAsFixed(1)} hr'
+                                      '${t.pfr > 1 ? " x 1.15 (resp. penalty)" : ""}'
                                       ' = ${iExt.toStringAsFixed(2)} mrem/person'
-                                      '  ×  ${t.workers} workers = ${cExt.toStringAsFixed(2)} person-mrem',
+                                      '  x  ${t.workers} workers = ${cExt.toStringAsFixed(2)} person-mrem',
                                       style: pw.TextStyle(
                                         fontSize: 9,
                                         color: _pdfInk2,
@@ -3674,7 +3674,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           if (t.nuclides.isNotEmpty) ...[
                             pw.SizedBox(height: 12),
                             _pdfSectionLabel(
-                              'Internal Dose — Radionuclide Contamination',
+                              'Internal Dose - Radionuclide Contamination',
                             ),
                             pw.Table(
                               border: pw.TableBorder.all(
@@ -3698,15 +3698,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   children: [
                                     _pdfTH('Nuclide'),
                                     _pdfTH(
-                                      'Contam\n(dpm/100cm²)',
+                                      'Contam\n(dpm/100cm2)',
                                       align: pw.TextAlign.right,
                                     ),
                                     _pdfTH(
-                                      'Air Conc\n(µCi/mL)',
+                                      'Air Conc\n(uCi/mL)',
                                       align: pw.TextAlign.right,
                                     ),
                                     _pdfTH(
-                                      'DAC\n(µCi/mL)',
+                                      'DAC\n(uCi/mL)',
                                       align: pw.TextAlign.right,
                                     ),
                                     _pdfTH(
@@ -3737,7 +3737,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                           vertical: 4,
                                         ),
                                         child: pw.Text(
-                                          n.name ?? '—',
+                                          n.name ?? '-',
                                           style: pw.TextStyle(
                                             fontSize: 8.5,
                                             fontWeight: pw.FontWeight.bold,
@@ -3821,9 +3821,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 ),
                               ),
                               child: pw.Text(
-                                'Air conc = (contam/100) × mPIF × (1/100) × (1/2.22×10⁶) µCi/mL'
+                                'Air conc = (contam/100) x mPIF x (1/100) x (1/2.22x10^6) uCi/mL'
                                 '    DAC Fr = air conc / DAC / PFE'
-                                '    Coll. dose = DAC Fr(eng) × (p-hrs/2000) × 5000 / PFR'
+                                '    Coll. dose = DAC Fr(eng) x (p-hrs/2000) x 5000 / PFR'
                                 '    mPIF = ${formatNumber(mPIF)}',
                                 style: pw.TextStyle(
                                   fontSize: 6.5,
@@ -3872,7 +3872,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 ...t.extremities.map(
                                   (e) => pw.TableRow(
                                     children: [
-                                      _pdfTD(e.nuclide ?? '—'),
+                                      _pdfTD(e.nuclide ?? '-'),
                                       _pdfTD(
                                         e.doseRate.toStringAsFixed(2),
                                         align: pw.TextAlign.right,
@@ -3941,23 +3941,23 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                     iExt.toStringAsFixed(2),
                                     align: pw.TextAlign.right,
                                   ),
-                                  _pdfTD('—', align: pw.TextAlign.right),
+                                  _pdfTD('-', align: pw.TextAlign.right),
                                   _pdfTD(
                                     cExt.toStringAsFixed(2),
                                     align: pw.TextAlign.right,
                                   ),
-                                  _pdfTD('—', align: pw.TextAlign.right),
+                                  _pdfTD('-', align: pw.TextAlign.right),
                                 ],
                               ),
                               pw.TableRow(
                                 children: [
                                   _pdfTD('Internal Effective'),
-                                  _pdfTD('—', align: pw.TextAlign.right),
+                                  _pdfTD('-', align: pw.TextAlign.right),
                                   _pdfTD(
                                     formatNumber(iInt),
                                     align: pw.TextAlign.right,
                                   ),
-                                  _pdfTD('—', align: pw.TextAlign.right),
+                                  _pdfTD('-', align: pw.TextAlign.right),
                                   _pdfTD(
                                     formatNumber(cInt),
                                     align: pw.TextAlign.right,
@@ -3998,9 +3998,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                       iExtrm.toStringAsFixed(2),
                                       align: pw.TextAlign.right,
                                     ),
-                                    _pdfTD('—', align: pw.TextAlign.right),
-                                    _pdfTD('—', align: pw.TextAlign.right),
-                                    _pdfTD('—', align: pw.TextAlign.right),
+                                    _pdfTD('-', align: pw.TextAlign.right),
+                                    _pdfTD('-', align: pw.TextAlign.right),
+                                    _pdfTD('-', align: pw.TextAlign.right),
                                   ],
                                 ),
                             ],
@@ -4008,14 +4008,14 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           pw.SizedBox(height: 3),
                           // Limits note
                           pw.Text(
-                            'Limits: Individual effective 500 mrem/yr  ·  Collective effective 750 person-mrem/yr'
-                            '${iExtrm > 0 ? "  ·  Extremity/skin 5,000 mrem/yr" : ""}',
+                            'Limits: Individual effective 500 mrem/yr  |  Collective effective 750 person-mrem/yr'
+                            '${iExtrm > 0 ? "  |  Extremity/skin 5,000 mrem/yr" : ""}',
                             style: pw.TextStyle(fontSize: 7.5, color: _pdfInk4),
                           ),
                           if ((totals['respiratorPenalty'] ?? 1.0) > 1.0) ...[
                             pw.SizedBox(height: 3),
                             pw.Text(
-                              'Note: External dose includes 15% respirator penalty (×1.15).',
+                              'Note: External dose includes 15% respirator penalty (x1.15).',
                               style: pw.TextStyle(
                                 fontSize: 7.5,
                                 color: _pdfInk3,
