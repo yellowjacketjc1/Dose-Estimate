@@ -277,25 +277,10 @@ class _MainScreenState extends State<MainScreen> {
                   padding: const EdgeInsets.only(left: 20, right: 10),
                   child: Row(
                     children: [
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: ink1,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'R742',
-                            style: TextStyle(
-                              color: bg,
-                              fontSize: 7,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                              fontFamily: 'Courier',
-                            ),
-                          ),
-                        ),
+                      Image.asset(
+                        'assets/app_icon.png',
+                        width: 32,
+                        height: 32,
                       ),
                       const SizedBox(width: 10),
                       Text(
