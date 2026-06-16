@@ -54,14 +54,14 @@ jobs:
           Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
           [Icons]
-          Name: "{group}\Dose Estimate"; Filename: "{app}\dose_dart_version.exe"
-          Name: "{commondesktop}\Dose Estimate"; Filename: "{app}\dose_dart_version.exe"; Tasks: desktopicon
+          Name: "{group}\Dose Estimate"; Filename: "{app}\DoseEstimate.exe"
+          Name: "{commondesktop}\Dose Estimate"; Filename: "{app}\DoseEstimate.exe"; Tasks: desktopicon
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
 
           [Run]
-          Filename: "{app}\dose_dart_version.exe"; Description: "Launch Dose Estimate"; Flags: nowait postinstall skipifsilent
+          Filename: "{app}\DoseEstimate.exe"; Description: "Launch Dose Estimate"; Flags: nowait postinstall skipifsilent
           '@
           $script | Out-File -FilePath setup.iss -Encoding UTF8
 
