@@ -1,0 +1,95 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release --build-name=1.0.0 --build-number=1
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes
+
+      - name: Create Inno Setup script
+        shell: pwsh
+        run: |
+          $script = @'
+          [Setup]
+          AppName=Dose Estimate
+          AppVersion=1.0.0 Beta
+          AppPublisher=742 CHP
+          DefaultDirName={userpf}\DoseEstimate
+          DefaultGroupName=Dose Estimate
+          OutputBaseFilename=DoseEstimate-Beta-1.0-Setup
+          OutputDir=installer
+          Compression=lzma2
+          SolidCompression=yes
+          PrivilegesRequired=lowest
+          PrivilegesRequiredOverridesAllowed=dialog
+          DisableProgramGroupPage=yes
+          UninstallDisplayName=Dose Estimate
+
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+
+          [Icons]
+          Name: "{group}\Dose Estimate"; Filename: "{app}\dose_dart_version.exe"
+          Name: "{commondesktop}\Dose Estimate"; Filename: "{app}\dose_dart_version.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
+
+          [Run]
+          Filename: "{app}\dose_dart_version.exe"; Description: "Launch Dose Estimate"; Flags: nowait postinstall skipifsilent
+          '@
+          $script | Out-File -FilePath setup.iss -Encoding UTF8
+
+      - name: Build installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss'
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DoseEstimate-Beta-1.0-Windows
+          path: installer/DoseEstimate-Beta-1.0-Setup.exe
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Dose Estimate Beta Version 1.0"
+          body: |
+            ## Dose Estimate — Beta Version 1.0
+
+            ### Installation
+            1. Download `DoseEstimate-Beta-1.0-Setup.exe`
+            2. Run the installer — **no admin rights required**
+            3. A desktop shortcut will be created automatically
+
+            ### Notes
+            - Installs to your personal user folder (no system-wide install needed)
+            - Windows 10 or later recommended
+          files: installer/DoseEstimate-Beta-1.0-Setup.exe
+          draft: false
+          prerelease: true
