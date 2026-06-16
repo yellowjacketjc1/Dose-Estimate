@@ -55,7 +55,7 @@ jobs:
 
           [Icons]
           Name: "{group}\Dose Estimate"; Filename: "{app}\DoseEstimate.exe"
-          Name: "{commondesktop}\Dose Estimate"; Filename: "{app}\DoseEstimate.exe"; Tasks: desktopicon
+          Name: "{userdesktop}\Dose Estimate"; Filename: "{app}\DoseEstimate.exe"; Tasks: desktopicon
 
           [Tasks]
           Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
