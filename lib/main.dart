@@ -6746,23 +6746,65 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final ph = totals['personHours']!;
                     final collective = totals['collectiveInternal']!;
                     final individual = t.workers > 0 ? collective / t.workers : 0.0;
-                    return [
-                      _FormulaStep('Air concentration',
+                    final pfe = t.pfe == 0.0 ? 1.0 : t.pfe;
+                    final pfr = t.pfr == 0.0 ? 1.0 : t.pfr;
+
+                    final steps = <_FormulaStep>[
+                      _FormulaStep('Symbolic — air concentration',
                         r'C_{air} = \frac{\%\text{contam}}{100} \times mPIF \times \frac{1}{100} \times \frac{1}{2.22\times10^6}',
                         comment: 'Converts % contamination to µCi/mL'),
-                      _FormulaStep('DAC fraction (post-PFE)',
-                        r'\text{DAC-fraction}_{eng} = \frac{C_{air} / DAC}{PFE}'),
-                      _FormulaStep('Collective internal dose',
-                        r'D_{int,collective} = \frac{\text{DAC-fraction}_{eng} \times \text{Person-Hours}}{2000 \text{ hr}} \times 5000 \text{ mrem} \div PFR'),
-                      _FormulaStep('mPIF used',
-                        'mPIF = ${mPIF.toStringAsExponential(3)}'),
-                      _FormulaStep('Person-Hours',
-                        '\\text{Person-Hours} = ${ph.toStringAsFixed(2)} \\ \\text{hr}'),
-                      _FormulaStep('Collective internal result',
-                        'D_{int,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
-                      _FormulaStep('Individual internal result',
-                        'D_{int,indiv} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}'),
+                      _FormulaStep('Symbolic — DAC fraction',
+                        r'\text{DAC-frac}_{eng} = \frac{C_{air}}{DAC \times PFE}'),
+                      _FormulaStep('Symbolic — collective dose per nuclide',
+                        r'D_i = \frac{\text{DAC-frac}_{eng,i} \times \text{Person-Hours}}{2000} \times \frac{5000}{PFR}'),
                     ];
+
+                    // Per-nuclide substituted values
+                    for (final n in t.nuclides) {
+                      final label = n.name ?? 'Unknown';
+                      final res = computeNuclideDose(n, t);
+                      final dac = res['dac'] ?? 1e-12;
+                      final airConc = res['airConc'] ?? 0.0;
+                      final dacFrEng = res['dacFractionEngOnly'] ?? 0.0;
+                      final nuclideCollective = res['collective'] ?? 0.0;
+                      final contam = n.contam;
+
+                      steps.add(_FormulaStep(
+                        '$label — air conc.',
+                        'C_{air} = \\frac{${contam.toStringAsFixed(1)}}{100} \\times ${mPIF.toStringAsExponential(3)} \\times \\frac{1}{100} \\times \\frac{1}{2.22\\times10^6} = ${airConc.toStringAsExponential(3)} \\ \\mu\\text{Ci/mL}',
+                      ));
+                      steps.add(_FormulaStep(
+                        '$label — DAC fraction',
+                        '\\text{DAC-frac}_{eng} = \\frac{${airConc.toStringAsExponential(3)}}{${dac.toStringAsExponential(3)} \\times ${pfe.toStringAsExponential(1)}} = ${dacFrEng.toStringAsExponential(3)}',
+                      ));
+                      steps.add(_FormulaStep(
+                        '$label — collective dose',
+                        'D_{${label}} = \\frac{${dacFrEng.toStringAsExponential(3)} \\times ${ph.toStringAsFixed(2)}}{2000} \\times \\frac{5000}{${pfr.toStringAsFixed(1)}} = ${nuclideCollective.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ));
+                    }
+
+                    // Summation if multiple nuclides
+                    if (t.nuclides.length > 1) {
+                      final sumParts = t.nuclides.map((n) {
+                        final res = computeNuclideDose(n, t);
+                        return (res['collective'] ?? 0.0).toStringAsFixed(2);
+                      }).join(' + ');
+                      steps.add(_FormulaStep(
+                        'Total collective (sum of nuclides)',
+                        'D_{int,collective} = $sumParts = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ));
+                    }
+
+                    steps.add(_FormulaStep(
+                      'Collective internal result',
+                      'D_{int,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                    ));
+                    steps.add(_FormulaStep(
+                      'Individual internal result',
+                      'D_{int,indiv} = \\frac{${collective.toStringAsFixed(2)}}{${t.workers.toStringAsFixed(0)}} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}',
+                    ));
+
+                    return steps;
                   },
                   child: Column(
                     children: [
