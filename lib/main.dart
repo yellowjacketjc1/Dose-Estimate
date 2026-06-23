@@ -3052,7 +3052,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
               ),
             );
 
-            final dosimetryTriggered = maxIndEff >= 100;
+            // Extremity dosimetry required when individual extremity dose ≥ 5,000 mrem
+            final maxIndExtrm = taskSummaries.fold<double>(
+              0,
+              (s, ts) => (ts['iExtrm'] as double) > s ? (ts['iExtrm'] as double) : s,
+            );
+            final dosimetryTriggered = maxIndExtrm >= 5000;
             final anyTriggeredWithDos =
                 anyTriggered || dosimetryTriggered;
 
@@ -3064,7 +3069,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 pw.SizedBox(width: 6),
                 pill('CAMs', camsTriggered),
                 pw.SizedBox(width: 6),
-                pill('Formal Dosimetry', dosimetryTriggered),
+                pill('Extremity Dosimetry', dosimetryTriggered),
               ],
             );
 
@@ -3207,12 +3212,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 );
               }
               if (dosimetryTriggered) {
-                rows.add(groupRow('Formal Dosimetry Required'));
+                rows.add(groupRow('Extremity Dosimetry Required'));
                 rows.add(
                   dataRow(
-                    'Maximum individual effective dose',
-                    '100 mrem',
-                    '${maxIndEff.toStringAsFixed(2)} mrem',
+                    'Maximum individual extremity dose',
+                    '5,000 mrem',
+                    '${maxIndExtrm.toStringAsFixed(2)} mrem',
                   ),
                 );
               }
@@ -4448,8 +4453,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         : totalCollective > 400
         ? 'warn'
         : 'pass';
-    // Formal dosimetry required when any worker is likely to receive ≥ 100 mrem
-    final dosimetryRequired = totalIndividual >= 100;
+    // Extremity dosimetry required when individual extremity dose ≥ 5,000 mrem
+    final dosimetryRequired = totalIndivExtremity >= 5000;
 
     Color _summaryColor(String st) => st == 'danger'
         ? _kDanger
@@ -4611,7 +4616,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         ),
                         const SizedBox(width: 8),
                         _StatusBadge(
-                          label: 'Formal Dosimetry',
+                          label: 'Extremity Dosimetry',
                           triggered: dosimetryRequired,
                         ),
                       ],
@@ -5756,12 +5761,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                           inputFormatters: [
                             _NonNegativeFormatter(),
-                            const _MaxValueFormatter(24),
+                            const _MaxValueFormatter(2000),
                           ],
                           decoration: _numericDecoration(
                             const InputDecoration(
                               labelText: 'Hours Each',
-                              helperText: 'Max 24 hrs',
+                              helperText: 'Max 2,000 hrs',
                             ),
                             (double.tryParse(t.hoursController.text) ?? 0) < 0,
                           ),
@@ -6104,12 +6109,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                                   inputFormatters: [
                                     _NonNegativeFormatter(),
-                                    const _MaxValueFormatter(24),
+                                    const _MaxValueFormatter(2000),
                                   ],
                                   decoration: _numericDecoration(
                                     const InputDecoration(
                                       labelText: 'Time (hr)',
-                                      helperText: 'Max 24 hrs',
+                                      helperText: 'Max 2,000 hrs',
                                     ),
                                     (double.tryParse(e.timeController.text) ?? 0) < 0,
                                   ),
