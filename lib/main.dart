@@ -1090,6 +1090,22 @@ class _NonNegativeFormatter extends TextInputFormatter {
   }
 }
 
+class _MaxValueFormatter extends TextInputFormatter {
+  final double max;
+  const _MaxValueFormatter(this.max);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    final v = double.tryParse(newValue.text);
+    if (v != null && v > max) return oldValue;
+    return newValue;
+  }
+}
+
 // Returns an InputDecoration with error styling when [isNegative] is true.
 InputDecoration _numericDecoration(InputDecoration base, bool isNegative) {
   if (!isNegative) return base;
@@ -1751,14 +1767,21 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   String formatNumber(double v) {
     final av = v.abs();
     if (av == 0.0) return '0';
-    // Use exponential notation for extremes
-    if ((av < 0.001 && av > 0) || av >= 1e6) {
+    if ((av < 0.001 && av > 0) || av >= 1e9) {
       return v.toStringAsExponential(2);
     }
-
-    // For normal-range values, round to three decimal places for cleaner UI.
-    // Keep sign and format with fixed 3 decimals.
-    return v.toStringAsFixed(3);
+    // Fixed 3 decimal places with thousands comma separators
+    final fixed = v.toStringAsFixed(3);
+    final parts = fixed.split('.');
+    final intPart = parts[0];
+    final decPart = parts.length > 1 ? parts[1] : '';
+    final sign = intPart.startsWith('-') ? '-' : '';
+    final digits = intPart.replaceFirst('-', '');
+    final withCommas = digits.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+$)'),
+      (m) => '${m[1]},',
+    );
+    return '$sign$withCommas${decPart.isEmpty ? "" : ".$decPart"}';
   }
 
   // Get DAC value for a nuclide, using custom DAC for "Other" nuclides
@@ -3029,17 +3052,25 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
               ),
             );
 
+            final dosimetryTriggered = maxIndEff >= 100;
+            final anyTriggeredWithDos =
+                anyTriggered || dosimetryTriggered;
+
             final pillRow = pw.Row(
               children: [
                 pill('ALARA Review', alaraTriggered),
+                pw.SizedBox(width: 6),
                 pill('Air Sampling', airTriggered),
+                pw.SizedBox(width: 6),
                 pill('CAMs', camsTriggered),
+                pw.SizedBox(width: 6),
+                pill('Formal Dosimetry', dosimetryTriggered),
               ],
             );
 
             // ── Trigger detail table — only when triggers fire ────────────────
             pw.Widget? triggerDetail;
-            if (anyTriggered) {
+            if (anyTriggeredWithDos) {
               pw.TableRow groupRow(String label) => pw.TableRow(
                 decoration: pw.BoxDecoration(color: _pdfSurf2),
                 children: [
@@ -3172,6 +3203,16 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     'DAC-hours with respiratory protection',
                     '40 DAC-hrs',
                     '${maxDacHrsWithResp.toStringAsFixed(2)} DAC-hrs',
+                  ),
+                );
+              }
+              if (dosimetryTriggered) {
+                rows.add(groupRow('Formal Dosimetry Required'));
+                rows.add(
+                  dataRow(
+                    'Maximum individual effective dose',
+                    '100 mrem',
+                    '${maxIndEff.toStringAsFixed(2)} mrem',
                   ),
                 );
               }
@@ -3379,6 +3420,64 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           if (triggerDetail != null) ...[
                             pw.SizedBox(height: 6),
                             triggerDetail!,
+                          ],
+                          if (overrideJustifications.isNotEmpty) ...[
+                            pw.SizedBox(height: 8),
+                            pw.Container(
+                              width: _pdfCW,
+                              padding: const pw.EdgeInsets.all(8),
+                              decoration: pw.BoxDecoration(
+                                color: PdfColor.fromHex('#FFF8E7'),
+                                border: pw.Border.all(
+                                  color: PdfColor.fromHex('#E6C96A'),
+                                  width: 0.5,
+                                ),
+                                borderRadius: const pw.BorderRadius.all(
+                                  pw.Radius.circular(4),
+                                ),
+                              ),
+                              child: pw.Column(
+                                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                                children: [
+                                  pw.Text(
+                                    'TRIGGER OVERRIDE JUSTIFICATIONS',
+                                    style: pw.TextStyle(
+                                      fontSize: 7.5,
+                                      fontWeight: pw.FontWeight.bold,
+                                      color: PdfColor.fromHex('#7A5C00'),
+                                    ),
+                                  ),
+                                  pw.SizedBox(height: 5),
+                                  for (final entry
+                                      in overrideJustifications.entries) ...[
+                                    pw.Row(
+                                      crossAxisAlignment:
+                                          pw.CrossAxisAlignment.start,
+                                      children: [
+                                        pw.Text(
+                                          '${entry.key}:  ',
+                                          style: pw.TextStyle(
+                                            fontSize: 8,
+                                            fontWeight: pw.FontWeight.bold,
+                                            color: _pdfInk2,
+                                          ),
+                                        ),
+                                        pw.Expanded(
+                                          child: pw.Text(
+                                            entry.value,
+                                            style: pw.TextStyle(
+                                              fontSize: 8,
+                                              color: _pdfInk2,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    pw.SizedBox(height: 3),
+                                  ],
+                                ],
+                              ),
+                            ),
                           ],
                           pw.SizedBox(height: 15),
                           _pdfSectionLabel('Task Summary'),
@@ -4349,6 +4448,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         : totalCollective > 400
         ? 'warn'
         : 'pass';
+    // Formal dosimetry required when any worker is likely to receive ≥ 100 mrem
+    final dosimetryRequired = totalIndividual >= 100;
 
     Color _summaryColor(String st) => st == 'danger'
         ? _kDanger
@@ -4507,6 +4608,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         _StatusBadge(
                           label: 'CAMs',
                           triggered: finalTriggers['camsRequired'] == true,
+                        ),
+                        const SizedBox(width: 8),
+                        _StatusBadge(
+                          label: 'Formal Dosimetry',
+                          triggered: dosimetryRequired,
                         ),
                       ],
                     ),
@@ -5648,9 +5754,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          inputFormatters: [_NonNegativeFormatter()],
+                          inputFormatters: [
+                            _NonNegativeFormatter(),
+                            const _MaxValueFormatter(24),
+                          ],
                           decoration: _numericDecoration(
-                            const InputDecoration(labelText: 'Hours Each'),
+                            const InputDecoration(
+                              labelText: 'Hours Each',
+                              helperText: 'Max 24 hrs',
+                            ),
                             (double.tryParse(t.hoursController.text) ?? 0) < 0,
                           ),
                           onChanged: (_) => setState(() {}),
@@ -5990,9 +6102,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 child: TextField(
                                   controller: e.timeController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [_NonNegativeFormatter()],
+                                  inputFormatters: [
+                                    _NonNegativeFormatter(),
+                                    const _MaxValueFormatter(24),
+                                  ],
                                   decoration: _numericDecoration(
-                                    const InputDecoration(labelText: 'Time (hr)'),
+                                    const InputDecoration(
+                                      labelText: 'Time (hr)',
+                                      helperText: 'Max 24 hrs',
+                                    ),
                                     (double.tryParse(e.timeController.text) ?? 0) < 0,
                                   ),
                                   onChanged: (v) => setState(() {
