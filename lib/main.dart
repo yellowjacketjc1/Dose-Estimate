@@ -313,7 +313,23 @@ class _MainScreenState extends State<MainScreen> {
                         label: 'Containment Analysis',
                         icon: Icons.shield_outlined,
                         active: _tab == 1,
-                        onTap: () => setState(() => _tab = 1),
+                        onTap: () {
+                          setState(() => _tab = 1);
+                          // Auto-populate containment nuclides from dose estimate
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            final doseState = _doseEstimateKey.currentState;
+                            final contState = _containmentKey.currentState;
+                            if (doseState != null && contState != null) {
+                              final names = doseState.tasks
+                                  .expand((t) => t.nuclides)
+                                  .map((n) => n.name ?? '')
+                                  .where((n) => n.isNotEmpty)
+                                  .toSet()
+                                  .toList();
+                              contState.populateNuclides(names);
+                            }
+                          });
+                        },
                       ),
                     ],
                   ),
@@ -684,21 +700,47 @@ class _InfoNote extends StatelessWidget {
 }
 
 /// Collapsible section card
-class _CollapsibleSection extends StatelessWidget {
+class _CollapsibleSection extends StatefulWidget {
   final String title;
   final bool initiallyExpanded;
   final ValueChanged<bool> onExpansionChanged;
   final Widget child;
+  final String? notes;
+  final ValueChanged<String>? onNotesChanged;
   const _CollapsibleSection({
     required this.title,
     required this.initiallyExpanded,
     required this.onExpansionChanged,
     required this.child,
+    this.notes,
+    this.onNotesChanged,
   });
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  bool _showNotes = false;
+  late final TextEditingController _notesController;
+
+  @override
+  void initState() {
+    super.initState();
+    _notesController = TextEditingController(text: widget.notes ?? '');
+    _showNotes = (widget.notes ?? '').isNotEmpty;
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final hasNotes = (widget.notes ?? '').isNotEmpty;
     return Container(
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
@@ -711,15 +753,64 @@ class _CollapsibleSection extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: ExpansionTile(
           title: Text(
-            title,
+            widget.title,
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
           ),
-          initiallyExpanded: initiallyExpanded,
-          onExpansionChanged: onExpansionChanged,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Tooltip(
+                message: hasNotes ? 'Notes (has content)' : 'Add notes',
+                child: IconButton(
+                  icon: Icon(
+                    hasNotes ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined,
+                    size: 18,
+                    color: hasNotes ? _kAccent : null,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => setState(() => _showNotes = !_showNotes),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(Icons.expand_more),
+            ],
+          ),
+          initiallyExpanded: widget.initiallyExpanded,
+          onExpansionChanged: widget.onExpansionChanged,
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
-          children: [child],
+          children: [
+            if (_showNotes) ...[
+              TextField(
+                controller: _notesController,
+                maxLines: null,
+                decoration: InputDecoration(
+                  hintText: 'Assumptions / notes for this section…',
+                  prefixIcon: const Icon(Icons.sticky_note_2_outlined, size: 18),
+                  suffixIcon: _notesController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16),
+                          onPressed: () {
+                            _notesController.clear();
+                            widget.onNotesChanged?.call('');
+                            setState(() {});
+                          },
+                        )
+                      : null,
+                  isDense: true,
+                  border: const OutlineInputBorder(),
+                ),
+                onChanged: (v) {
+                  widget.onNotesChanged?.call(v);
+                  setState(() {});
+                },
+              ),
+              const SizedBox(height: 10),
+            ],
+            widget.child,
+          ],
         ),
       ),
     );
@@ -1043,6 +1134,9 @@ class TaskData {
   // Track expansion state for each section
   Map<String, bool> sectionExpansionStates;
 
+  // Notes for each section (keyed by stateKey)
+  Map<String, String> sectionNotes;
+
   // Persistent controllers so cursor/selection behavior remains stable
   final TextEditingController titleController = TextEditingController();
   final FocusNode titleFocusNode = FocusNode();
@@ -1072,6 +1166,7 @@ class TaskData {
     List<NuclideEntry>? nuclides,
     List<ExtremityEntry>? extremities,
     Map<String, bool>? sectionExpansionStates,
+    Map<String, String>? sectionNotes,
   }) : nuclides = nuclides ?? [NuclideEntry()],
        extremities = extremities ?? [],
        sectionExpansionStates =
@@ -1083,7 +1178,8 @@ class TaskData {
              'extremityDose': false,
              'protectionFactors': false,
              'internalDose': false,
-           } {
+           },
+       sectionNotes = sectionNotes ?? {} {
     titleController.text = title;
     locationController.text = location;
     workersController.text = workers.toString();
@@ -1156,6 +1252,7 @@ class TaskData {
     'nuclides': nuclides.map((n) => n.toJson()).toList(),
     'extremities': extremities.map((e) => e.toJson()).toList(),
     'sectionExpansionStates': sectionExpansionStates,
+    'sectionNotes': sectionNotes,
   };
 
   static TaskData fromJson(Map<String, dynamic> j) {
@@ -1186,6 +1283,9 @@ class TaskData {
       extremities: rawExtremities ?? const <ExtremityEntry>[],
       sectionExpansionStates: j['sectionExpansionStates'] != null
           ? Map<String, bool>.from(j['sectionExpansionStates'])
+          : null,
+      sectionNotes: j['sectionNotes'] != null
+          ? Map<String, String>.from(j['sectionNotes'])
           : null,
     );
   }
@@ -4018,6 +4118,140 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         );
       }
 
+      // ════════════════════════════════════════════════════════════════════
+      // NOTES PAGE — only added when at least one section has notes
+      // ════════════════════════════════════════════════════════════════════
+      const _sectionNames = {
+        'timeEstimation': 'Time Estimation',
+        'mpifCalculation': 'mPIF Calculation',
+        'externalDose': 'External Dose Estimate',
+        'extremityDose': 'Extremity / Skin Dose',
+        'protectionFactors': 'Protection Factors',
+        'internalDose': 'Internal Dose Estimate',
+      };
+
+      // Collect all non-empty notes with task + section context
+      final noteEntries = <Map<String, String>>[];
+      for (var ti = 0; ti < tasks.length; ti++) {
+        final t = tasks[ti];
+        for (final entry in t.sectionNotes.entries) {
+          if (entry.value.trim().isEmpty) continue;
+          noteEntries.add({
+            'task': 'Task ${ti + 1}${t.title.isNotEmpty ? " — ${t.title}" : ""}',
+            'section': _sectionNames[entry.key] ?? entry.key,
+            'note': entry.value.trim(),
+          });
+        }
+      }
+
+      if (noteEntries.isNotEmpty) {
+        pdf.addPage(
+          pw.MultiPage(
+            pageFormat: PdfPageFormat.letter,
+            margin: pw.EdgeInsets.zero,
+            header: (pw.Context ctx) => pw.Container(
+              width: _pdfPW,
+              color: _pdfNavy,
+              padding: const pw.EdgeInsets.only(
+                left: _pdfM,
+                top: 28,
+                right: _pdfM,
+                bottom: 10,
+              ),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text(
+                    'Assumptions & Notes',
+                    style: pw.TextStyle(
+                      fontSize: 13,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                  pw.Text(
+                    '$wo  |  $dateStr',
+                    style: pw.TextStyle(fontSize: 9, color: _pdfNavyLight),
+                  ),
+                ],
+              ),
+            ),
+            build: (pw.Context ctx) => [
+              pw.Padding(
+                padding: const pw.EdgeInsets.fromLTRB(
+                  _pdfM,
+                  16,
+                  _pdfM,
+                  _pdfM,
+                ),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < noteEntries.length; i++) ...[
+                      if (i > 0) pw.SizedBox(height: 10),
+                      pw.Container(
+                        width: _pdfCW,
+                        padding: const pw.EdgeInsets.all(10),
+                        decoration: pw.BoxDecoration(
+                          color: _pdfSurf2,
+                          border: pw.Border.all(
+                            color: _pdfHair,
+                            width: 0.5,
+                          ),
+                          borderRadius: const pw.BorderRadius.all(
+                            pw.Radius.circular(5),
+                          ),
+                        ),
+                        child: pw.Column(
+                          crossAxisAlignment: pw.CrossAxisAlignment.start,
+                          children: [
+                            pw.Row(
+                              children: [
+                                pw.Text(
+                                  noteEntries[i]['task']!,
+                                  style: pw.TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: pw.FontWeight.bold,
+                                    color: _pdfNavy,
+                                  ),
+                                ),
+                                pw.Text(
+                                  '  ·  ',
+                                  style: pw.TextStyle(
+                                    fontSize: 8,
+                                    color: _pdfInk4,
+                                  ),
+                                ),
+                                pw.Text(
+                                  noteEntries[i]['section']!,
+                                  style: pw.TextStyle(
+                                    fontSize: 8,
+                                    color: _pdfInk3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            pw.SizedBox(height: 5),
+                            pw.Text(
+                              noteEntries[i]['note']!,
+                              style: pw.TextStyle(
+                                fontSize: 9,
+                                color: _pdfInk2,
+                                lineSpacing: 2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+
       // Print
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
@@ -5324,6 +5558,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
             t.sectionExpansionStates[stateKey] ?? defaultExpanded,
         onExpansionChanged: (v) =>
             setState(() => t.sectionExpansionStates[stateKey] = v),
+        notes: t.sectionNotes[stateKey],
+        onNotesChanged: (v) =>
+            setState(() => t.sectionNotes[stateKey] = v),
         child: child,
       );
     }
@@ -5441,21 +5678,21 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<double>(
-                              value: t.mpifR,
-                              decoration: const InputDecoration(
-                                labelText: 'Release Factor (R)',
-                                hintText: 'Select R',
-                              ),
-                              items: releaseFactors.entries
+                            child: DropdownMenu<double>(
+                              label: const Text('Release Factor (R)'),
+                              hintText: 'Select or type R',
+                              initialSelection: t.mpifR,
+                              expandedInsets: EdgeInsets.zero,
+                              enableFilter: true,
+                              dropdownMenuEntries: releaseFactors.entries
                                   .map(
-                                    (e) => DropdownMenuItem(
+                                    (e) => DropdownMenuEntry(
                                       value: e.value,
-                                      child: Text(e.key),
+                                      label: e.key,
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) {
+                              onSelected: (v) {
                                 t.mpifR = v;
                                 setState(() {});
                               },
@@ -5463,21 +5700,21 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: DropdownButtonFormField<double>(
-                              value: t.mpifC > 0.0 ? t.mpifC : null,
-                              decoration: const InputDecoration(
-                                labelText: 'Confinement Factor (C)',
-                                hintText: 'Select C',
-                              ),
-                              items: confinementFactors.entries
+                            child: DropdownMenu<double>(
+                              label: const Text('Confinement Factor (C)'),
+                              hintText: 'Select or type C',
+                              initialSelection: t.mpifC > 0.0 ? t.mpifC : null,
+                              expandedInsets: EdgeInsets.zero,
+                              enableFilter: true,
+                              dropdownMenuEntries: confinementFactors.entries
                                   .map(
-                                    (e) => DropdownMenuItem(
+                                    (e) => DropdownMenuEntry(
                                       value: e.value,
-                                      child: Text(e.key),
+                                      label: e.key,
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) {
+                              onSelected: (v) {
                                 t.mpifC = v ?? 0.0;
                                 setState(() {});
                               },
@@ -5489,25 +5726,23 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: DropdownButtonFormField<double>(
-                              value: t.mpifD > 0 ? t.mpifD : null,
-                              decoration: const InputDecoration(
-                                labelText: 'Dispersibility (D)',
-                                hintText: 'Select D',
-                              ),
-                              items: const [1.0, 10.0]
-                                  .map(
-                                    (v) => DropdownMenuItem(
-                                      value: v,
-                                      child: Text(
-                                        v == 1.0
-                                            ? 'No added dispersibility (1)'
-                                            : 'Enhanced dispersibility (10)',
-                                      ),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
+                            child: DropdownMenu<double>(
+                              label: const Text('Dispersibility (D)'),
+                              hintText: 'Select or type D',
+                              initialSelection: t.mpifD > 0 ? t.mpifD : null,
+                              expandedInsets: EdgeInsets.zero,
+                              enableFilter: true,
+                              dropdownMenuEntries: const [
+                                DropdownMenuEntry(
+                                  value: 1.0,
+                                  label: 'No added dispersibility (1)',
+                                ),
+                                DropdownMenuEntry(
+                                  value: 10.0,
+                                  label: 'Enhanced dispersibility (10)',
+                                ),
+                              ],
+                              onSelected: (v) {
                                 if (v != null) {
                                   t.mpifD = v;
                                   t.mpifDController.text = v.toString();
@@ -5518,21 +5753,22 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: DropdownButtonFormField<int>(
-                              value: t.mpifU > 0 ? t.mpifU.toInt() : null,
-                              decoration: const InputDecoration(
-                                labelText: 'Uncertainty (U)',
-                                hintText: 'Select U',
-                              ),
-                              items: List.generate(10, (i) => i + 1)
+                            child: DropdownMenu<int>(
+                              label: const Text('Uncertainty (U)'),
+                              hintText: 'Select or type U',
+                              initialSelection:
+                                  t.mpifU > 0 ? t.mpifU.toInt() : null,
+                              expandedInsets: EdgeInsets.zero,
+                              enableFilter: true,
+                              dropdownMenuEntries: List.generate(10, (i) => i + 1)
                                   .map(
-                                    (v) => DropdownMenuItem(
+                                    (v) => DropdownMenuEntry(
                                       value: v,
-                                      child: Text('$v'),
+                                      label: '$v',
                                     ),
                                   )
                                   .toList(),
-                              onChanged: (v) {
+                              onSelected: (v) {
                                 if (v != null) {
                                   t.mpifU = v.toDouble();
                                   t.mpifUController.text = v.toString();
@@ -5543,21 +5779,23 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: DropdownButtonFormField<double>(
-                              value: t.mpifS > 0 ? t.mpifS : null,
-                              decoration: const InputDecoration(
-                                labelText: 'Special Form (S)',
-                                hintText: 'Select S',
-                              ),
-                              items: [0.1, 1.0]
-                                  .map(
-                                    (v) => DropdownMenuItem(
-                                      value: v,
-                                      child: Text(v.toString()),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (v) {
+                            child: DropdownMenu<double>(
+                              label: const Text('Special Form (S)'),
+                              hintText: 'Select or type S',
+                              initialSelection: t.mpifS > 0 ? t.mpifS : null,
+                              expandedInsets: EdgeInsets.zero,
+                              enableFilter: true,
+                              dropdownMenuEntries: const [
+                                DropdownMenuEntry(
+                                  value: 0.1,
+                                  label: 'Special form (0.1)',
+                                ),
+                                DropdownMenuEntry(
+                                  value: 1.0,
+                                  label: 'Normal form (1.0)',
+                                ),
+                              ],
+                              onSelected: (v) {
                                 if (v != null) {
                                   t.mpifS = v;
                                   t.mpifSController.text = v.toString();

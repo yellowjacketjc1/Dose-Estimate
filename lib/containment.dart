@@ -224,6 +224,33 @@ class ContainmentTabState extends State<ContainmentTab>
     super.dispose();
   }
 
+  /// Pre-fills the source term with nuclide names from the dose estimate.
+  /// Only runs if the source term is currently empty or all-blank; won't
+  /// overwrite work the user has already entered.
+  void populateNuclides(List<String> names) {
+    final hasData = sourceTerm.any((e) => e.name.isNotEmpty);
+    if (hasData) return;
+    if (names.isEmpty) return;
+
+    setState(() {
+      for (final e in sourceTerm) {
+        e.dispose();
+      }
+      sourceTerm = names
+          .where((n) => NuclideData.dacValues.containsKey(n))
+          .map(
+            (n) => NuclideMixEntry(
+              name: n,
+              fraction: names.length == 1 ? 1.0 : 0.0,
+              dac: NuclideData.dacValues[n] ?? 0.0,
+            ),
+          )
+          .toList();
+      if (sourceTerm.isEmpty) sourceTerm.add(NuclideMixEntry(name: '', fraction: 0.0, dac: 0.0));
+    });
+    calculate();
+  }
+
   void addNuclideRow() {
     setState(() {
       // Start with empty name so placeholder shows
