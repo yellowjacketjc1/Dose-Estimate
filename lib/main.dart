@@ -187,50 +187,36 @@ ThemeData _buildTheme(Brightness brightness) {
 }
 
 // ─── Version / update checker ────────────────────────────────────────────────
-const String _kAppVersion = '1.0.0';
+const String _kAppVersion = '1.0.4-beta';
 const String _kGitHubRepo = 'yellowjacketjc1/Dose-Estimate';
 
-enum _UpdateStatus { idle, checking, upToDate, updateAvailable, error }
+enum _UpdateStatus { idle, checking, upToDate, updateAvailable, downloading, error }
 
 class _UpdateResult {
   final _UpdateStatus status;
   final String? latestVersion;
   final String? releaseUrl;
+  final String? assetDownloadUrl;
+  final String? assetName;
   final String? errorMessage;
-  const _UpdateResult(this.status, {this.latestVersion, this.releaseUrl, this.errorMessage});
+  const _UpdateResult(this.status, {
+    this.latestVersion,
+    this.releaseUrl,
+    this.assetDownloadUrl,
+    this.assetName,
+    this.errorMessage,
+  });
 }
 
-Future<_UpdateResult> _checkForUpdate() async {
-  try {
-    final uri = Uri.parse(
-        'https://api.github.com/repos/$_kGitHubRepo/releases/latest');
-    final response = await http.get(uri, headers: {'Accept': 'application/vnd.github+json'})
-        .timeout(const Duration(seconds: 10));
-    if (response.statusCode == 404) {
-      return const _UpdateResult(_UpdateStatus.upToDate);
-    }
-    if (response.statusCode != 200) {
-      return _UpdateResult(_UpdateStatus.error,
-          errorMessage: 'Server returned ${response.statusCode}');
-    }
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    final tag = (data['tag_name'] as String? ?? '').replaceFirst(RegExp(r'^v'), '');
-    final url = data['html_url'] as String? ?? 'https://github.com/$_kGitHubRepo/releases';
-    if (tag.isEmpty) return const _UpdateResult(_UpdateStatus.upToDate);
-    final isNewer = _isNewerVersion(tag, _kAppVersion);
-    return isNewer
-        ? _UpdateResult(_UpdateStatus.updateAvailable, latestVersion: tag, releaseUrl: url)
-        : const _UpdateResult(_UpdateStatus.upToDate);
-  } catch (e) {
-    return _UpdateResult(_UpdateStatus.error, errorMessage: e.toString());
-  }
+/// Strips leading 'v' and '-beta'/'-alpha' suffixes for numeric comparison.
+List<int> _parseVersion(String v) {
+  final clean = v.replaceFirst(RegExp(r'^v'), '').replaceAll(RegExp(r'[-+].*$'), '');
+  return clean.split('.').map((p) => int.tryParse(p) ?? 0).toList();
 }
 
 bool _isNewerVersion(String remote, String current) {
-  List<int> parse(String v) =>
-      v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
-  final r = parse(remote);
-  final c = parse(current);
+  final r = _parseVersion(remote);
+  final c = _parseVersion(current);
   for (var i = 0; i < 3; i++) {
     final rv = i < r.length ? r[i] : 0;
     final cv = i < c.length ? c[i] : 0;
@@ -238,6 +224,48 @@ bool _isNewerVersion(String remote, String current) {
     if (rv < cv) return false;
   }
   return false;
+}
+
+Future<_UpdateResult> _checkForUpdate() async {
+  try {
+    // Fetch all releases so pre-releases are included
+    final uri = Uri.parse('https://api.github.com/repos/$_kGitHubRepo/releases');
+    final response = await http
+        .get(uri, headers: {'Accept': 'application/vnd.github+json'})
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode != 200) {
+      return _UpdateResult(_UpdateStatus.error,
+          errorMessage: 'Server returned ${response.statusCode}');
+    }
+    final releases = jsonDecode(response.body) as List<dynamic>;
+    if (releases.isEmpty) return const _UpdateResult(_UpdateStatus.upToDate);
+
+    // Pick the most recent release (first in list)
+    final latest = releases.first as Map<String, dynamic>;
+    final tag = (latest['tag_name'] as String? ?? '');
+    final releaseUrl = latest['html_url'] as String? ??
+        'https://github.com/$_kGitHubRepo/releases';
+
+    if (tag.isEmpty || !_isNewerVersion(tag, _kAppVersion)) {
+      return const _UpdateResult(_UpdateStatus.upToDate);
+    }
+
+    // Find the first .exe asset
+    final assets = (latest['assets'] as List<dynamic>? ?? []);
+    final exeAsset = assets.cast<Map<String, dynamic>>().where(
+      (a) => (a['name'] as String? ?? '').toLowerCase().endsWith('.exe'),
+    ).firstOrNull;
+
+    return _UpdateResult(
+      _UpdateStatus.updateAvailable,
+      latestVersion: tag.replaceFirst(RegExp(r'^v'), ''),
+      releaseUrl: releaseUrl,
+      assetDownloadUrl: exeAsset?['browser_download_url'] as String?,
+      assetName: exeAsset?['name'] as String?,
+    );
+  } catch (e) {
+    return _UpdateResult(_UpdateStatus.error, errorMessage: e.toString());
+  }
 }
 
 void _showAboutDialog(BuildContext context) {
@@ -254,7 +282,10 @@ class _AboutDialogState extends State<_AboutDialog> {
   _UpdateStatus _status = _UpdateStatus.idle;
   String? _latestVersion;
   String? _releaseUrl;
+  String? _assetDownloadUrl;
+  String? _assetName;
   String? _errorMessage;
+  double? _downloadProgress; // 0.0–1.0, null = indeterminate
 
   Future<void> _check() async {
     setState(() => _status = _UpdateStatus.checking);
@@ -264,8 +295,51 @@ class _AboutDialogState extends State<_AboutDialog> {
         _status = result.status;
         _latestVersion = result.latestVersion;
         _releaseUrl = result.releaseUrl;
+        _assetDownloadUrl = result.assetDownloadUrl;
+        _assetName = result.assetName;
         _errorMessage = result.errorMessage;
       });
+    }
+  }
+
+  Future<void> _downloadAndInstall() async {
+    if (_assetDownloadUrl == null) return;
+    setState(() {
+      _status = _UpdateStatus.downloading;
+      _downloadProgress = null;
+    });
+
+    try {
+      final tempDir = Directory.systemTemp;
+      final fileName = _assetName ?? 'DoseEstimateSetup.exe';
+      final savePath = '${tempDir.path}${Platform.pathSeparator}$fileName';
+
+      // Stream download with progress
+      final request = http.Request('GET', Uri.parse(_assetDownloadUrl!));
+      final streamed = await request.send().timeout(const Duration(minutes: 5));
+      final total = streamed.contentLength ?? 0;
+      var received = 0;
+      final sink = File(savePath).openWrite();
+      await for (final chunk in streamed.stream) {
+        sink.add(chunk);
+        received += chunk.length;
+        if (total > 0 && mounted) {
+          setState(() => _downloadProgress = received / total);
+        }
+      }
+      await sink.close();
+
+      // Launch installer and exit
+      await Process.start(savePath, [], runInShell: false,
+          mode: ProcessStartMode.detached);
+      exit(0);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _status = _UpdateStatus.error;
+          _errorMessage = 'Download failed: $e';
+        });
+      }
     }
   }
 
@@ -287,7 +361,8 @@ class _AboutDialogState extends State<_AboutDialog> {
         updateWidget = const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2)),
             SizedBox(width: 10),
             Text('Checking…'),
           ],
@@ -298,7 +373,7 @@ class _AboutDialogState extends State<_AboutDialog> {
           children: [
             Icon(Icons.check_circle_outline, size: 18, color: _kOk),
             const SizedBox(width: 8),
-            Text('You\'re up to date', style: TextStyle(color: _kOk)),
+            Text("You're up to date", style: TextStyle(color: _kOk)),
           ],
         );
       case _UpdateStatus.updateAvailable:
@@ -311,27 +386,71 @@ class _AboutDialogState extends State<_AboutDialog> {
                 Icon(Icons.new_releases_outlined, size: 18, color: _kWarn),
                 const SizedBox(width: 8),
                 Text('Version $_latestVersion available',
-                    style: TextStyle(color: _kWarn, fontWeight: FontWeight.w600)),
+                    style: TextStyle(
+                        color: _kWarn, fontWeight: FontWeight.w600)),
               ],
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _releaseUrl != null
-                  ? () => launchUrl(Uri.parse(_releaseUrl!))
-                  : null,
-              icon: const Icon(Icons.open_in_new, size: 14),
-              label: const Text('View Release on GitHub'),
-            ),
+            const SizedBox(height: 10),
+            if (_assetDownloadUrl != null)
+              FilledButton.icon(
+                onPressed: _downloadAndInstall,
+                icon: const Icon(Icons.download_outlined, size: 16),
+                label: const Text('Download & Install'),
+              )
+            else
+              OutlinedButton.icon(
+                onPressed: _releaseUrl != null
+                    ? () => launchUrl(Uri.parse(_releaseUrl!))
+                    : null,
+                icon: const Icon(Icons.open_in_new, size: 14),
+                label: const Text('View Release on GitHub'),
+              ),
+          ],
+        );
+      case _UpdateStatus.downloading:
+        updateWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Downloading update…',
+                style: TextStyle(fontSize: 13, color: ink3)),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(value: _downloadProgress),
+            if (_downloadProgress != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  '${(_downloadProgress! * 100).toStringAsFixed(0)}%',
+                  style: TextStyle(fontSize: 11, color: ink3),
+                ),
+              ),
+            const SizedBox(height: 6),
+            Text('The installer will launch automatically.\nThe app will close.',
+                style: TextStyle(fontSize: 11, color: ink3)),
           ],
         );
       case _UpdateStatus.error:
-        updateWidget = Row(
-          mainAxisSize: MainAxisSize.min,
+        updateWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.error_outline, size: 18, color: _kDanger),
-            const SizedBox(width: 8),
-            Flexible(child: Text('Could not check: ${_errorMessage ?? "unknown error"}',
-                style: TextStyle(color: _kDanger, fontSize: 12))),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.error_outline, size: 18, color: _kDanger),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    _errorMessage ?? 'Unknown error',
+                    style: TextStyle(color: _kDanger, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: _check,
+              icon: const Icon(Icons.refresh, size: 14),
+              label: const Text('Retry'),
+            ),
           ],
         );
     }
@@ -345,7 +464,7 @@ class _AboutDialogState extends State<_AboutDialog> {
         ],
       ),
       content: SizedBox(
-        width: 340,
+        width: 360,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -355,7 +474,7 @@ class _AboutDialogState extends State<_AboutDialog> {
             const SizedBox(height: 4),
             Text('Built by Jesse Coyle',
                 style: TextStyle(fontSize: 12, color: ink3)),
-            Text('Repository: github.com/$_kGitHubRepo',
+            Text('github.com/$_kGitHubRepo',
                 style: TextStyle(fontSize: 11, color: ink3)),
             const Divider(height: 24),
             updateWidget,
@@ -363,7 +482,10 @@ class _AboutDialogState extends State<_AboutDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        if (_status != _UpdateStatus.downloading)
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
       ],
     );
   }
