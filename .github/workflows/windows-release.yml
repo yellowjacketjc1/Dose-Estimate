@@ -26,7 +26,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release --build-name=1.0.0 --build-number=1
+        run: flutter build windows --release --build-name=1.1.0 --build-number=1
 
       - name: Install Inno Setup
         run: choco install innosetup --yes
@@ -37,11 +37,11 @@ jobs:
           $script = @'
           [Setup]
           AppName=Dose Estimate
-          AppVersion=1.0.0 Beta
+          AppVersion=1.1.0 Beta
           AppPublisher=742 CHP
           DefaultDirName={userpf}\DoseEstimate
           DefaultGroupName=Dose Estimate
-          OutputBaseFilename=DoseEstimate-Beta-1.0-Setup
+          OutputBaseFilename=DoseEstimate-Beta-1.1-Setup
           OutputDir=installer
           Compression=lzma2
           SolidCompression=yes
@@ -71,25 +71,35 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DoseEstimate-Beta-1.0-Windows
-          path: installer/DoseEstimate-Beta-1.0-Setup.exe
+          name: DoseEstimate-Beta-1.1-Windows
+          path: installer/DoseEstimate-Beta-1.1-Setup.exe
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Dose Estimate Beta Version 1.0"
+          name: "Dose Estimate Beta Version 1.1"
           body: |
-            ## Dose Estimate — Beta Version 1.0
+            ## Dose Estimate — Beta Version 1.1
+
+            ### What's New
+            - Formula display (Σ button) on each section — shows the math with values substituted in
+            - Windows splash screen with app icon on launch
+            - Check for Updates with auto-download and install
+            - WCD (Work Control Document) replaces Work Order label
+            - Section notes, mPIF typeahead dropdowns, containment auto-populate
+            - Extremity dosimetry badge, undo deleted task, ft² area input
+            - Custom C value, release fraction justification, mixing factor hints
+            - Incompatible C/PF warning, comma-formatted numbers
 
             ### Installation
-            1. Download `DoseEstimate-Beta-1.0-Setup.exe`
+            1. Download `DoseEstimate-Beta-1.1-Setup.exe`
             2. Run the installer — **no admin rights required**
             3. A desktop shortcut will be created automatically
 
             ### Notes
             - Installs to your personal user folder (no system-wide install needed)
             - Windows 10 or later recommended
-          files: installer/DoseEstimate-Beta-1.0-Setup.exe
+          files: installer/DoseEstimate-Beta-1.1-Setup.exe
           draft: false
           prerelease: true

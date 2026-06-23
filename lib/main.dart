@@ -187,7 +187,7 @@ ThemeData _buildTheme(Brightness brightness) {
 }
 
 // ─── Version / update checker ────────────────────────────────────────────────
-const String _kAppVersion = '1.0.4-beta';
+const String _kAppVersion = '1.1.0-beta';
 const String _kGitHubRepo = 'yellowjacketjc1/Dose-Estimate';
 
 enum _UpdateStatus { idle, checking, upToDate, updateAvailable, downloading, error }
