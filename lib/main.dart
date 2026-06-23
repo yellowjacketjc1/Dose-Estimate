@@ -184,6 +184,94 @@ ThemeData _buildTheme(Brightness brightness) {
   );
 }
 
+// ─── Splash screen (Windows only) ────────────────────────────────────────────
+class _SplashScreen extends StatefulWidget {
+  final VoidCallback onDone;
+  const _SplashScreen({required this.onDone});
+
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _fadeIn;
+  late final Animation<double> _fadeOut;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _fadeIn = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.0, 0.35, curve: Curves.easeIn),
+    );
+    _fadeOut = CurvedAnimation(
+      parent: _ctrl,
+      curve: const Interval(0.75, 1.0, curve: Curves.easeOut),
+    );
+    _ctrl.forward().then((_) => widget.onDone());
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, _) {
+        final opacity = _fadeIn.value * (1.0 - _fadeOut.value);
+        return Scaffold(
+          backgroundColor: const Color(0xFF1A1A2E),
+          body: Opacity(
+            opacity: opacity,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    'assets/app_icon.png',
+                    width: 140,
+                    height: 140,
+                    filterQuality: FilterQuality.high,
+                  ),
+                  const SizedBox(height: 28),
+                  const Text(
+                    'Dose Estimate',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w300,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Built by Jesse Coyle',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 13,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class DoseEstimateApp extends StatefulWidget {
   final Map<String, dynamic>? initialState;
   final int initialTab;
@@ -195,6 +283,7 @@ class DoseEstimateApp extends StatefulWidget {
 
 class _DoseEstimateAppState extends State<DoseEstimateApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  bool _showSplash = !kIsWeb && Platform.isWindows;
 
   void _toggleTheme() {
     setState(() {
@@ -211,12 +300,14 @@ class _DoseEstimateAppState extends State<DoseEstimateApp> {
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
-      home: MainScreen(
-        onToggleTheme: _toggleTheme,
-        themeMode: _themeMode,
-        initialState: widget.initialState,
-        initialTab: widget.initialTab,
-      ),
+      home: _showSplash
+          ? _SplashScreen(onDone: () => setState(() => _showSplash = false))
+          : MainScreen(
+              onToggleTheme: _toggleTheme,
+              themeMode: _themeMode,
+              initialState: widget.initialState,
+              initialTab: widget.initialTab,
+            ),
       debugShowCheckedModeBanner: false,
     );
   }
@@ -5235,7 +5326,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   child: Row(
                     children: [
                       Text(
-                        'WORK ORDER',
+                        'WCD',
                         style: TextStyle(
                           fontSize: 11,
                           color: ink3,
@@ -5469,7 +5560,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
           child: Row(
             children: [
               _WorkField(
-                label: 'Work Order',
+                label: 'WCD (Work Control Document)',
                 controller: workOrderController,
                 onChanged: () => setState(() {}),
               ),
@@ -5508,7 +5599,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      workOrderController.text.isEmpty ? '—' : 'See work order',
+                      workOrderController.text.isEmpty ? '—' : 'See WCD',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
