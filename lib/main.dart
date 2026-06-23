@@ -15,6 +15,7 @@ import 'qa_loader_stub.dart'
     if (dart.library.html) 'qa_loader_web.dart'
     as qa_loader;
 import 'nuclides.dart';
+import 'package:flutter_math_fork/flutter_math.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -721,6 +722,131 @@ class _InfoNote extends StatelessWidget {
   }
 }
 
+// ─── Formula system ────────────────────────────────────────────────────────
+
+class _FormulaStep {
+  final String label;       // e.g. "Symbolic formula"
+  final String latex;       // LaTeX string
+  final String? comment;    // optional plain-text explanation
+  const _FormulaStep(this.label, this.latex, {this.comment});
+}
+
+void showFormulaDialog(BuildContext context, String title, List<_FormulaStep> steps) {
+  showDialog<void>(
+    context: context,
+    builder: (ctx) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+      child: _FormulaDialog(title: title, steps: steps),
+    ),
+  );
+}
+
+class _FormulaDialog extends StatelessWidget {
+  final String title;
+  final List<_FormulaStep> steps;
+  const _FormulaDialog({required this.title, required this.steps});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1C1C1E) : Colors.white;
+    final ink1 = isDark ? _kDarkInk1 : _kInk1;
+    final ink3 = isDark ? _kDarkInk3 : _kInk3;
+    final hair = isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 680),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
+            child: Row(
+              children: [
+                const Text('Σ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: ink1,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 18),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Divider(color: hair, height: 24),
+          // Steps
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < steps.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 20),
+                    Text(
+                      steps[i].label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: ink3,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Math.tex(
+                        steps[i].latex,
+                        textStyle: TextStyle(fontSize: 15, color: ink1),
+                        onErrorFallback: (e) => SelectableText(
+                          steps[i].latex,
+                          style: TextStyle(
+                            fontFamily: 'Courier',
+                            fontSize: 13,
+                            color: ink1,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (steps[i].comment != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        steps[i].comment!,
+                        style: TextStyle(fontSize: 12, color: ink3),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Collapsible section card
 class _CollapsibleSection extends StatefulWidget {
   final String title;
@@ -729,6 +855,7 @@ class _CollapsibleSection extends StatefulWidget {
   final Widget child;
   final String? notes;
   final ValueChanged<String>? onNotesChanged;
+  final VoidCallback? onShowFormula;
   const _CollapsibleSection({
     required this.title,
     required this.initiallyExpanded,
@@ -736,6 +863,7 @@ class _CollapsibleSection extends StatefulWidget {
     required this.child,
     this.notes,
     this.onNotesChanged,
+    this.onShowFormula,
   });
 
   @override
@@ -781,6 +909,24 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (widget.onShowFormula != null) ...[
+                Tooltip(
+                  message: 'Show formula',
+                  child: IconButton(
+                    icon: const Text(
+                      'Σ',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: widget.onShowFormula,
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
               Tooltip(
                 message: hasNotes ? 'Notes (has content)' : 'Add notes',
                 child: IconButton(
@@ -5786,6 +5932,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       required String title,
       required String stateKey,
       bool defaultExpanded = false,
+      List<_FormulaStep> Function()? formulaBuilder,
       required Widget child,
     }) {
       return _CollapsibleSection(
@@ -5797,6 +5944,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         notes: t.sectionNotes[stateKey],
         onNotesChanged: (v) =>
             setState(() => t.sectionNotes[stateKey] = v),
+        onShowFormula: formulaBuilder == null
+            ? null
+            : () => showFormulaDialog(context, title, formulaBuilder()),
         child: child,
       );
     }
@@ -5863,6 +6013,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   title: 'Time Estimation',
                   stateKey: 'timeEstimation',
                   defaultExpanded: true,
+                  formulaBuilder: () {
+                    final workers = t.workers;
+                    final hours = t.hours;
+                    final ph = totals['personHours']!;
+                    return [
+                      _FormulaStep('Symbolic formula',
+                        r'\text{Person-Hours} = N_{workers} \times H_{each}'),
+                      _FormulaStep('Values substituted',
+                        '\\text{Person-Hours} = ${workers.toStringAsFixed(0)} \\times ${hours.toStringAsFixed(2)}'),
+                      _FormulaStep('Result',
+                        '\\text{Person-Hours} = ${ph.toStringAsFixed(2)}'),
+                    ];
+                  },
                   child: Row(
                     children: [
                       Expanded(
@@ -5909,6 +6072,24 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'mPIF Calculation',
                   stateKey: 'mpifCalculation',
+                  formulaBuilder: () {
+                    final effectiveC = t.mpifC == -1.0 ? (t.mpifCCustom ?? 0.0) : t.mpifC;
+                    final mPIF = computeMPIF(t);
+                    final r = t.mpifR ?? 1.0;
+                    final d = t.mpifD;
+                    final o = t.mpifO;
+                    final s = t.mpifS;
+                    final u = t.mpifU;
+                    return [
+                      _FormulaStep('Symbolic formula',
+                        r'mPIF = 1\times10^{-6} \times R \times C \times D \times O \times S \times U',
+                        comment: 'All factors from HPP 9.1 Attachment A'),
+                      _FormulaStep('Values substituted',
+                        'mPIF = 1\\times10^{-6} \\times $r \\times $effectiveC \\times $d \\times $o \\times $s \\times $u'),
+                      _FormulaStep('Result',
+                        'mPIF = ${mPIF.toStringAsExponential(3)}'),
+                    ];
+                  },
                   child: Column(
                     children: [
                       Row(
@@ -6109,6 +6290,25 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'External Dose Estimate',
                   stateKey: 'externalDose',
+                  formulaBuilder: () {
+                    final ph = totals['personHours']!;
+                    final dr = t.doseRate;
+                    final collective = totals['collectiveExternal']!;
+                    final individual = t.workers > 0 ? collective / t.workers : 0.0;
+                    return [
+                      _FormulaStep('Collective external dose',
+                        r'D_{ext,collective} = \dot{D} \times \text{Person-Hours}',
+                        comment: 'Dose rate × total person-hours'),
+                      _FormulaStep('Values substituted',
+                        'D_{ext,collective} = ${dr.toStringAsFixed(2)} \\ \\text{mrem/hr} \\times ${ph.toStringAsFixed(2)} \\ \\text{hr}'),
+                      _FormulaStep('Collective result',
+                        'D_{ext,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
+                      _FormulaStep('Individual external dose',
+                        r'D_{ext,indiv} = D_{ext,collective} / N_{workers}'),
+                      _FormulaStep('Individual result',
+                        'D_{ext,indiv} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}'),
+                    ];
+                  },
                   child: Column(
                     children: [
                       TextField(
@@ -6166,6 +6366,29 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'Extremity / Skin Dose',
                   stateKey: 'extremityDose',
+                  formulaBuilder: () {
+                    final indiv = totals['individualExtremity']!;
+                    final collective = totals['collectiveExtremity']!;
+                    final entryLines = t.extremities
+                        .where((e) => e.doseRate > 0 && e.time > 0)
+                        .map((e) =>
+                            '${e.nuclide ?? "entry"}: ${e.doseRate.toStringAsFixed(2)} \\times ${e.time.toStringAsFixed(2)} = ${(e.doseRate * e.time).toStringAsFixed(2)}')
+                        .join(r', \quad ');
+                    return [
+                      _FormulaStep('Per-entry dose',
+                        r'D_{entry} = \dot{D}_{entry} \times T_{entry}',
+                        comment: 'Dose rate (mrem/hr) × time (hr) per extremity entry'),
+                      if (entryLines.isNotEmpty)
+                        _FormulaStep('Entry values (mrem)',
+                          entryLines),
+                      _FormulaStep('Individual extremity dose',
+                        r'D_{ext,indiv} = \sum_{i} D_{entry,i}'),
+                      _FormulaStep('Individual result',
+                        'D_{ext,indiv} = ${indiv.toStringAsFixed(2)} \\ \\text{mrem/person}'),
+                      _FormulaStep('Collective extremity',
+                        'D_{ext,collective} = D_{ext,indiv} \\times N_{workers} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
+                    ];
+                  },
                   child: Column(
                     children: [
                       ...List.generate(t.extremities.length, (ei) {
@@ -6336,6 +6559,27 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'Protection Factors',
                   stateKey: 'protectionFactors',
+                  formulaBuilder: () {
+                    final pfe = t.pfe;
+                    final pfr = t.pfr;
+                    final combined = pfe * pfr;
+                    return [
+                      _FormulaStep('Engineering control factor (PFE)',
+                        r'\text{PFE} = \frac{\text{airborne concentration without controls}}{\text{airborne concentration with controls}}',
+                        comment: 'Ventilation/engineering controls reduce airborne concentration'),
+                      _FormulaStep('Respirator factor (PFR)',
+                        r'\text{PFR} = \frac{1}{\text{APF}} \quad \Rightarrow \quad \text{PFR} = ${(1/pfr).toStringAsFixed(5)}',
+                        comment: 'Assigned Protection Factor of respirator'),
+                      _FormulaStep('Combined protection',
+                        r'PF_{combined} = PFE \times PFR'),
+                      _FormulaStep('Values substituted',
+                        'PF_{combined} = ${pfe.toStringAsExponential(1)} \\times ${pfr.toStringAsExponential(1)}'),
+                      _FormulaStep('Result',
+                        'PF_{combined} = ${combined.toStringAsExponential(2)}'),
+                      _FormulaStep('Respirator penalty',
+                        r'\text{If respirator used: dose} \times 1.15 \text{ (15\% work rate penalty)}'),
+                    ];
+                  },
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -6497,6 +6741,29 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'Internal Dose Calculation',
                   stateKey: 'internalDose',
+                  formulaBuilder: () {
+                    final mPIF = computeMPIF(t);
+                    final ph = totals['personHours']!;
+                    final collective = totals['collectiveInternal']!;
+                    final individual = t.workers > 0 ? collective / t.workers : 0.0;
+                    return [
+                      _FormulaStep('Air concentration',
+                        r'C_{air} = \frac{\%\text{contam}}{100} \times mPIF \times \frac{1}{100} \times \frac{1}{2.22\times10^6}',
+                        comment: 'Converts % contamination to µCi/mL'),
+                      _FormulaStep('DAC fraction (post-PFE)',
+                        r'\text{DAC-fraction}_{eng} = \frac{C_{air} / DAC}{PFE}'),
+                      _FormulaStep('Collective internal dose',
+                        r'D_{int,collective} = \frac{\text{DAC-fraction}_{eng} \times \text{Person-Hours}}{2000 \text{ hr}} \times 5000 \text{ mrem} \div PFR'),
+                      _FormulaStep('mPIF used',
+                        'mPIF = ${mPIF.toStringAsExponential(3)}'),
+                      _FormulaStep('Person-Hours',
+                        '\\text{Person-Hours} = ${ph.toStringAsFixed(2)} \\ \\text{hr}'),
+                      _FormulaStep('Collective internal result',
+                        'D_{int,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
+                      _FormulaStep('Individual internal result',
+                        'D_{int,indiv} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}'),
+                    ];
+                  },
                   child: Column(
                     children: [
                       ...List.generate(t.nuclides.length, (ni) {
