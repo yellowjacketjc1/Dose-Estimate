@@ -1158,7 +1158,8 @@ class TaskData {
   int workers;
   double hours;
   double? mpifR; // null = not yet selected; 0.0 = encapsulated (R=0 is a valid selection)
-  double mpifC;
+  double mpifC; // -1.0 = custom value; use mpifCCustom for actual value
+  double? mpifCCustom; // only used when mpifC == -1.0
   double mpifD;
   double mpifO;
   double mpifS;
@@ -1184,6 +1185,7 @@ class TaskData {
   final TextEditingController mpifDController = TextEditingController();
   final TextEditingController mpifSController = TextEditingController();
   final TextEditingController mpifUController = TextEditingController();
+  final TextEditingController mpifCCustomController = TextEditingController();
   final TextEditingController doseRateController = TextEditingController();
 
   TaskData({
@@ -1194,6 +1196,7 @@ class TaskData {
     // null = not yet selected; 0.0 = encapsulated (R=0 explicitly chosen). UI requires selection before computing mPIF.
     this.mpifR,
     this.mpifC = 0.0,
+    this.mpifCCustom,
     this.mpifD = 0.0,
     this.mpifO = 1.0,
     this.mpifS = 0.0,
@@ -1250,6 +1253,11 @@ class TaskData {
     mpifUController.addListener(() {
       mpifU = double.tryParse(mpifUController.text) ?? 0.0;
     });
+    mpifCCustomController.addListener(() {
+      if (mpifC == -1.0) {
+        mpifCCustom = double.tryParse(mpifCCustomController.text);
+      }
+    });
     doseRateController.addListener(() {
       doseRate = double.tryParse(doseRateController.text) ?? 0.0;
     });
@@ -1264,6 +1272,7 @@ class TaskData {
     mpifDController.dispose();
     mpifSController.dispose();
     mpifUController.dispose();
+    mpifCCustomController.dispose();
     doseRateController.dispose();
     for (final n in nuclides) {
       n.disposeControllers();
@@ -1280,6 +1289,7 @@ class TaskData {
     'hours': hours,
     'mpifR': mpifR,
     'mpifC': mpifC,
+    'mpifCCustom': mpifCCustom,
     'mpifD': mpifD,
     'mpifO': mpifO,
     'mpifS': mpifS,
@@ -1308,6 +1318,7 @@ class TaskData {
       // Use 0.0 when values are missing so mPIF remains "not set" until user selects factors.
       mpifR: j['mpifR'] != null ? (j['mpifR'] as num).toDouble() : null,
       mpifC: (j['mpifC'] ?? 0).toDouble(),
+      mpifCCustom: j['mpifCCustom'] != null ? (j['mpifCCustom'] as num).toDouble() : null,
       mpifD: (j['mpifD'] ?? 0).toDouble(),
       mpifO: 1.0, // fixed — occupancy is always 1 for dose estimate tasks
       mpifS: (j['mpifS'] ?? 0).toDouble(),
@@ -1602,11 +1613,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     'Fume Hood (1.0)': 1.0,
     'Enhanced Fume Hood (0.1)': 0.1,
     'Glovebox, Hot Cell (0.01)': 0.01,
+    'Custom value': -1.0,
   };
 
   // occupancyFactors removed — O is fixed at 1.0 for all dose estimate tasks.
 
   List<TaskData> tasks = [];
+  // Last deleted task for undo
+  TaskData? _deletedTask;
+  int _deletedTaskIndex = -1;
   TextEditingController workOrderController = TextEditingController();
   TextEditingController descriptionController = TextEditingController();
   TextEditingController dateController = TextEditingController();
@@ -1671,18 +1686,49 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   }
 
   void removeTask(int index) {
+    final removed = tasks[index];
+    // Stash for undo — dispose the previous stash first
+    _deletedTask?.disposeControllers();
+    _deletedTask = TaskData.fromJson(removed.toJson()); // deep copy via JSON
+    _deletedTaskIndex = index;
     setState(() {
-      tasks[index].disposeControllers();
+      removed.disposeControllers();
       tasks.removeAt(index);
       _activeIdx = -1;
     });
     widget.onTaskCountChanged?.call();
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Task "${removed.title.isNotEmpty ? removed.title : "Untitled"}" removed',
+        ),
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            if (_deletedTask == null) return;
+            final restored = TaskData.fromJson(_deletedTask!.toJson());
+            setState(() {
+              final insertAt = _deletedTaskIndex.clamp(0, tasks.length);
+              tasks.insert(insertAt, restored);
+              _activeIdx = insertAt;
+            });
+            _deletedTask?.disposeControllers();
+            _deletedTask = null;
+            widget.onTaskCountChanged?.call();
+          },
+        ),
+      ),
+    );
   }
 
   double computeMPIF(TaskData t) {
+    // Resolve C: -1.0 means custom, use mpifCCustom
+    final effectiveC = t.mpifC == -1.0 ? (t.mpifCCustom ?? 0.0) : t.mpifC;
     // require all mPIF factors to be selected (non-zero) before computing
     if (t.mpifR == null ||
-        t.mpifC <= 0.0 ||
+        effectiveC <= 0.0 ||
         t.mpifD <= 0.0 ||
         t.mpifS <= 0.0 ||
         t.mpifU <= 0.0) {
@@ -1692,7 +1738,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     final mPIF =
         1e-6 *
         (t.mpifR!) *
-        (t.mpifC) *
+        effectiveC *
         (t.mpifD) *
         (t.mpifO) *
         (t.mpifS) *
@@ -2336,7 +2382,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     if (t.mpifR != null && !_isAllowedDouble(t.mpifR!, _allowedMpifRValues)) {
       return 'mPIF Release Factor (R) must be one of ${_allowedMpifRValues.toList()..sort()} (got ${t.mpifR}).';
     }
-    if (!_isAllowedDouble(t.mpifC, _allowedMpifCValues)) {
+    if (t.mpifC != -1.0 && !_isAllowedDouble(t.mpifC, _allowedMpifCValues)) {
       return 'mPIF Confinement Factor (C) must be one of ${_allowedMpifCValues.toList()..sort()} (got ${t.mpifC}).';
     }
     if (!_isAllowedDouble(t.mpifD, _allowedMpifDValues)) {
@@ -3779,7 +3825,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                           },
                                           {
                                             'l': 'C (confinement)',
-                                            'v': t.mpifC.toString(),
+                                            'v': t.mpifC == -1.0
+                                                ? 'Custom (${t.mpifCCustom ?? "?"})'
+                                                : t.mpifC.toString(),
                                           },
                                           {
                                             'l': 'D (dispersibility)',
@@ -5891,7 +5939,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                             child: DropdownMenu<double>(
                               label: const Text('Confinement Factor (C)'),
                               hintText: 'Select or type C',
-                              initialSelection: t.mpifC > 0.0 ? t.mpifC : null,
+                              initialSelection:
+                                  (t.mpifC > 0.0 || t.mpifC == -1.0)
+                                      ? t.mpifC
+                                      : null,
                               expandedInsets: EdgeInsets.zero,
                               enableFilter: true,
                               dropdownMenuEntries: confinementFactors.entries
@@ -5904,12 +5955,10 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   .toList(),
                               onSelected: (v) {
                                 t.mpifC = v ?? 0.0;
+                                if (v != -1.0) t.mpifCCustom = null;
                                 // Auto-suggest PFE only if user hasn't
                                 // already picked a non-default value
-                                if (v != null && t.pfe == 1.0) {
-                                  // open bench / bagged → no controls
-                                  // fume hood → Type I (1,000)
-                                  // enhanced fume hood / glovebox → Type II
+                                if (v != null && v != -1.0 && t.pfe == 1.0) {
                                   t.pfe = (v >= 10.0)
                                       ? 1.0
                                       : (v == 1.0)
@@ -5922,6 +5971,33 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                         ],
                       ),
+                      if (t.mpifC == -1.0) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 240,
+                              child: TextField(
+                                controller: t.mpifCCustomController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Custom C value',
+                                  hintText: 'e.g. 0.05',
+                                  helperText:
+                                      'Enter a value between standard confinement factors',
+                                ),
+                                onChanged: (v) {
+                                  t.mpifCCustom = double.tryParse(v);
+                                  setState(() {});
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         children: [
@@ -6260,7 +6336,42 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 section(
                   title: 'Protection Factors',
                   stateKey: 'protectionFactors',
-                  child: Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Incompatibility warning: high confinement C but no engineering controls
+                      if (t.mpifC > 0 && t.mpifC <= 0.1 && t.pfe == 1.0)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: _kWarnWash,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _kWarn.withValues(alpha: 0.5),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 16,
+                                  color: _kWarn,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'mPIF uses ${t.mpifC <= 0.01 ? "Glovebox/Hot Cell" : "Enhanced Fume Hood"} confinement (C=${t.mpifC}) '
+                                    'but PFE is set to No Controls. Consider selecting Type I or Type II engineering controls.',
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      Row(
                     children: [
                       Expanded(
                         child: Column(
@@ -6375,6 +6486,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ],
                         ),
                       ),
+                    ],
+                  ),
                     ],
                   ),
                 ),

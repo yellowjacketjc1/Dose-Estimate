@@ -166,6 +166,10 @@ class ContainmentTabState extends State<ContainmentTab>
     text: '1',
   );
 
+  // Justification for using the minimum release fraction (HPP 9.5 §8 step 1.3)
+  final TextEditingController frJustificationController =
+      TextEditingController();
+
   // Contamination Calculator Controllers
   final TextEditingController contaminationController = TextEditingController();
   final TextEditingController areaController = TextEditingController();
@@ -218,6 +222,7 @@ class ContainmentTabState extends State<ContainmentTab>
     uncertaintyController.dispose();
     contaminationController.dispose();
     areaController.dispose();
+    frJustificationController.dispose();
     for (var e in sourceTerm) {
       e.dispose();
     }
@@ -244,6 +249,7 @@ class ContainmentTabState extends State<ContainmentTab>
       uncertaintyController.text = '1';
       contaminationController.clear();
       areaController.clear();
+      frJustificationController.clear();
       calculatedResult = null;
       isSufficient = null;
       pifResult = null;
@@ -336,10 +342,12 @@ class ContainmentTabState extends State<ContainmentTab>
 
   void calculateContamination() {
     final contam = double.tryParse(contaminationController.text) ?? 0.0;
-    final area = double.tryParse(areaController.text) ?? 0.0;
+    final areaFt2 = double.tryParse(areaController.text) ?? 0.0;
 
-    if (contam > 0 && area > 0) {
-      final totalDpm = contam * (area / 100.0);
+    if (contam > 0 && areaFt2 > 0) {
+      // Convert ft² → cm²: 1 ft² = 929.03 cm²
+      final areaCm2 = areaFt2 * 929.03;
+      final totalDpm = contam * (areaCm2 / 100.0);
       final totalUci = totalDpm / 2.22e6;
       totalActivityController.text = totalUci.toStringAsExponential(3);
       calculate();
@@ -511,6 +519,7 @@ class ContainmentTabState extends State<ContainmentTab>
       'uncertainty': uncertaintyController.text,
       'contamination': contaminationController.text,
       'area': areaController.text,
+      'frJustification': frJustificationController.text,
     },
     'sourceTerm': sourceTerm
         .map(
@@ -588,6 +597,8 @@ class ContainmentTabState extends State<ContainmentTab>
       contaminationController.text = (controllers['contamination'] ?? '')
           .toString();
       areaController.text = (controllers['area'] ?? '').toString();
+      frJustificationController.text =
+          (controllers['frJustification'] ?? '').toString();
 
       for (final entry in sourceTerm) {
         entry.dispose();
@@ -1284,7 +1295,7 @@ class ContainmentTabState extends State<ContainmentTab>
                               child: TextField(
                                 controller: areaController,
                                 decoration: const InputDecoration(
-                                  labelText: 'Area (cm²)',
+                                  labelText: 'Area (ft²)',
                                   isDense: true,
                                 ),
                                 keyboardType:
@@ -1741,6 +1752,59 @@ class ContainmentTabState extends State<ContainmentTab>
                           ),
                         ],
                       ),
+                      // HPP 9.5 §8 1.3: justify use of minimum fr value
+                      if (selectedForm != null &&
+                          currentFr <= selectedForm!.minFr &&
+                          currentFr > 0) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF8E7),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE6C96A)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.warning_amber_rounded,
+                                    size: 15,
+                                    color: Color(0xFF9A7000),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Justification required (HPP 9.5 §8 step 1.3)',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: ink2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'You are using the minimum release fraction for this form type. '
+                                'Document your justification below.',
+                                style: TextStyle(fontSize: 11, color: ink3),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: frJustificationController,
+                                maxLines: 2,
+                                decoration: const InputDecoration(
+                                  hintText: 'Enter justification…',
+                                  isDense: true,
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 14),
                       Row(
                         children: [
@@ -1793,6 +1857,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                   controller: volumeController,
                                   decoration: const InputDecoration(
                                     isDense: true,
+                                    helperText: 'Typical: 1×10⁶–1×10⁹ cm³',
                                   ),
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
@@ -1815,8 +1880,18 @@ class ContainmentTabState extends State<ContainmentTab>
                                 const SizedBox(height: 4),
                                 TextField(
                                   controller: mixingController,
-                                  decoration: const InputDecoration(
+                                  decoration: InputDecoration(
                                     isDense: true,
+                                    helperText: 'Typical: 0.1–1.0',
+                                    errorText: () {
+                                      final v = double.tryParse(
+                                        mixingController.text,
+                                      );
+                                      if (v != null && (v <= 0 || v > 2)) {
+                                        return 'Enter a value > 0';
+                                      }
+                                      return null;
+                                    }(),
                                   ),
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
