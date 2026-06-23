@@ -1765,6 +1765,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   // Format numbers for display: use plain formatting for readable ranges,
   // exponential only when very small or very large.
   String formatNumber(double v) {
+    if (v.isNaN || v.isInfinite) return '—';
     final av = v.abs();
     if (av == 0.0) return '0';
     if ((av < 0.001 && av > 0) || av >= 1e9) {
@@ -5759,15 +5760,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
-                          inputFormatters: [
-                            _NonNegativeFormatter(),
-                            const _MaxValueFormatter(2000),
-                          ],
+                          inputFormatters: [_NonNegativeFormatter()],
                           decoration: _numericDecoration(
-                            const InputDecoration(
-                              labelText: 'Hours Each',
-                              helperText: 'Max 2,000 hrs',
-                            ),
+                            const InputDecoration(labelText: 'Hours Each'),
                             (double.tryParse(t.hoursController.text) ?? 0) < 0,
                           ),
                           onChanged: (_) => setState(() {}),
@@ -5777,7 +5772,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       Expanded(
                         child: _MiniStat(
                           label: 'Person-Hours',
-                          value: totals['personHours']!.toStringAsFixed(2),
+                          value: formatNumber(totals['personHours']!),
                           color: _kAccent,
                         ),
                       ),
@@ -5970,7 +5965,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           Expanded(
                             child: _MiniStat(
                               label: 'Person-Hours',
-                              value: totals['personHours']!.toStringAsFixed(2),
+                              value: formatNumber(totals['personHours']!),
                               color: _kOk,
                             ),
                           ),
@@ -6107,15 +6102,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 child: TextField(
                                   controller: e.timeController,
                                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                  inputFormatters: [
-                                    _NonNegativeFormatter(),
-                                    const _MaxValueFormatter(2000),
-                                  ],
+                                  inputFormatters: [_NonNegativeFormatter()],
                                   decoration: _numericDecoration(
-                                    const InputDecoration(
-                                      labelText: 'Time (hr)',
-                                      helperText: 'Max 2,000 hrs',
-                                    ),
+                                    const InputDecoration(labelText: 'Time (hr)'),
                                     (double.tryParse(e.timeController.text) ?? 0) < 0,
                                   ),
                                   onChanged: (v) => setState(() {
