@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import 'containment.dart';
 import 'file_download_stub.dart'
     if (dart.library.html) 'file_download_web.dart'
@@ -184,6 +186,189 @@ ThemeData _buildTheme(Brightness brightness) {
   );
 }
 
+// ─── Version / update checker ────────────────────────────────────────────────
+const String _kAppVersion = '1.0.0';
+const String _kGitHubRepo = 'yellowjacketjc1/Dose-Estimate';
+
+enum _UpdateStatus { idle, checking, upToDate, updateAvailable, error }
+
+class _UpdateResult {
+  final _UpdateStatus status;
+  final String? latestVersion;
+  final String? releaseUrl;
+  final String? errorMessage;
+  const _UpdateResult(this.status, {this.latestVersion, this.releaseUrl, this.errorMessage});
+}
+
+Future<_UpdateResult> _checkForUpdate() async {
+  try {
+    final uri = Uri.parse(
+        'https://api.github.com/repos/$_kGitHubRepo/releases/latest');
+    final response = await http.get(uri, headers: {'Accept': 'application/vnd.github+json'})
+        .timeout(const Duration(seconds: 10));
+    if (response.statusCode == 404) {
+      return const _UpdateResult(_UpdateStatus.upToDate);
+    }
+    if (response.statusCode != 200) {
+      return _UpdateResult(_UpdateStatus.error,
+          errorMessage: 'Server returned ${response.statusCode}');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final tag = (data['tag_name'] as String? ?? '').replaceFirst(RegExp(r'^v'), '');
+    final url = data['html_url'] as String? ?? 'https://github.com/$_kGitHubRepo/releases';
+    if (tag.isEmpty) return const _UpdateResult(_UpdateStatus.upToDate);
+    final isNewer = _isNewerVersion(tag, _kAppVersion);
+    return isNewer
+        ? _UpdateResult(_UpdateStatus.updateAvailable, latestVersion: tag, releaseUrl: url)
+        : const _UpdateResult(_UpdateStatus.upToDate);
+  } catch (e) {
+    return _UpdateResult(_UpdateStatus.error, errorMessage: e.toString());
+  }
+}
+
+bool _isNewerVersion(String remote, String current) {
+  List<int> parse(String v) =>
+      v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+  final r = parse(remote);
+  final c = parse(current);
+  for (var i = 0; i < 3; i++) {
+    final rv = i < r.length ? r[i] : 0;
+    final cv = i < c.length ? c[i] : 0;
+    if (rv > cv) return true;
+    if (rv < cv) return false;
+  }
+  return false;
+}
+
+void _showAboutDialog(BuildContext context) {
+  showDialog(context: context, builder: (_) => const _AboutDialog());
+}
+
+class _AboutDialog extends StatefulWidget {
+  const _AboutDialog();
+  @override
+  State<_AboutDialog> createState() => _AboutDialogState();
+}
+
+class _AboutDialogState extends State<_AboutDialog> {
+  _UpdateStatus _status = _UpdateStatus.idle;
+  String? _latestVersion;
+  String? _releaseUrl;
+  String? _errorMessage;
+
+  Future<void> _check() async {
+    setState(() => _status = _UpdateStatus.checking);
+    final result = await _checkForUpdate();
+    if (mounted) {
+      setState(() {
+        _status = result.status;
+        _latestVersion = result.latestVersion;
+        _releaseUrl = result.releaseUrl;
+        _errorMessage = result.errorMessage;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final ink1 = isDark ? _kDarkInk1 : _kInk1;
+    final ink3 = isDark ? _kDarkInk3 : _kInk3;
+
+    Widget updateWidget;
+    switch (_status) {
+      case _UpdateStatus.idle:
+        updateWidget = FilledButton.icon(
+          onPressed: _check,
+          icon: const Icon(Icons.system_update_alt_outlined, size: 16),
+          label: const Text('Check for Updates'),
+        );
+      case _UpdateStatus.checking:
+        updateWidget = const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(width: 10),
+            Text('Checking…'),
+          ],
+        );
+      case _UpdateStatus.upToDate:
+        updateWidget = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline, size: 18, color: _kOk),
+            const SizedBox(width: 8),
+            Text('You\'re up to date', style: TextStyle(color: _kOk)),
+          ],
+        );
+      case _UpdateStatus.updateAvailable:
+        updateWidget = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.new_releases_outlined, size: 18, color: _kWarn),
+                const SizedBox(width: 8),
+                Text('Version $_latestVersion available',
+                    style: TextStyle(color: _kWarn, fontWeight: FontWeight.w600)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _releaseUrl != null
+                  ? () => launchUrl(Uri.parse(_releaseUrl!))
+                  : null,
+              icon: const Icon(Icons.open_in_new, size: 14),
+              label: const Text('View Release on GitHub'),
+            ),
+          ],
+        );
+      case _UpdateStatus.error:
+        updateWidget = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 18, color: _kDanger),
+            const SizedBox(width: 8),
+            Flexible(child: Text('Could not check: ${_errorMessage ?? "unknown error"}',
+                style: TextStyle(color: _kDanger, fontSize: 12))),
+          ],
+        );
+    }
+
+    return AlertDialog(
+      title: Row(
+        children: [
+          Image.asset('assets/app_icon.png', width: 36, height: 36),
+          const SizedBox(width: 12),
+          Text('Dose Estimate', style: TextStyle(color: ink1)),
+        ],
+      ),
+      content: SizedBox(
+        width: 340,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Version $_kAppVersion',
+                style: TextStyle(fontSize: 13, color: ink3)),
+            const SizedBox(height: 4),
+            Text('Built by Jesse Coyle',
+                style: TextStyle(fontSize: 12, color: ink3)),
+            Text('Repository: github.com/$_kGitHubRepo',
+                style: TextStyle(fontSize: 11, color: ink3)),
+            const Divider(height: 24),
+            updateWidget,
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
+    );
+  }
+}
+
 // ─── Splash screen (Windows only) ────────────────────────────────────────────
 class _SplashScreen extends StatefulWidget {
   final VoidCallback onDone;
@@ -339,6 +524,24 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     _tab = widget.initialTab;
+    _silentUpdateCheck();
+  }
+
+  Future<void> _silentUpdateCheck() async {
+    final result = await _checkForUpdate();
+    if (!mounted) return;
+    if (result.status == _UpdateStatus.updateAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Update available: v${result.latestVersion}'),
+          duration: const Duration(seconds: 8),
+          action: SnackBarAction(
+            label: 'View',
+            onPressed: () => _showAboutDialog(context),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -488,6 +691,18 @@ class _MainScreenState extends State<MainScreen> {
                         _containmentKey.currentState?.printContainmentReport(),
                   ),
                 ],
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.info_outline, size: 16),
+                  style: IconButton.styleFrom(
+                    foregroundColor: ink3,
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => _showAboutDialog(context),
+                  tooltip: 'About / Check for Updates',
+                ),
                 const SizedBox(width: 4),
                 IconButton(
                   icon: Icon(
