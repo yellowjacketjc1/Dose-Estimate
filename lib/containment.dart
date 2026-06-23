@@ -254,6 +254,22 @@ class ContainmentTabState extends State<ContainmentTab>
     addNuclideRow();
   }
 
+  /// Pre-selects the confinement type based on the mPIF C factor from the
+  /// dose estimate. Only applies when the confinement is still at the default
+  /// (Open benchtop) so user-made selections are never overwritten.
+  void suggestConfinement(double? mpifC) {
+    if (mpifC == null || mpifC <= 0) return;
+    // Only auto-set if still at the default (Open benchtop, pifC == 100)
+    if (selectedConfinement?.pifC != 100.0) return;
+    final match = confinementTypes.where((c) => c.pifC == mpifC).firstOrNull;
+    if (match == null) return;
+    setState(() {
+      selectedConfinement = match;
+      faController.text = match.defaultFa.toString();
+    });
+    calculate();
+  }
+
   /// Pre-fills the source term with nuclide names from the dose estimate.
   /// Only runs if the source term is currently empty or all-blank; won't
   /// overwrite work the user has already entered.

@@ -327,6 +327,22 @@ class _MainScreenState extends State<MainScreen> {
                                   .toSet()
                                   .toList();
                               contState.populateNuclides(names);
+                              // Use the most common non-zero C factor across tasks
+                              final cValues = doseState.tasks
+                                  .map((t) => t.mpifC)
+                                  .where((c) => c > 0)
+                                  .toList();
+                              if (cValues.isNotEmpty) {
+                                final mostCommonC = cValues
+                                    .fold<Map<double, int>>({}, (m, c) {
+                                      m[c] = (m[c] ?? 0) + 1;
+                                      return m;
+                                    })
+                                    .entries
+                                    .reduce((a, b) => a.value >= b.value ? a : b)
+                                    .key;
+                                contState.suggestConfinement(mostCommonC);
+                              }
                             }
                           });
                         },
