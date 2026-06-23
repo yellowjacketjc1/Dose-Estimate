@@ -340,6 +340,12 @@ class _MainScreenState extends State<MainScreen> {
                 // Action buttons
                 if (_tab == 0) ...[
                   _TopbarAction(
+                    label: 'New',
+                    icon: Icons.add_circle_outline,
+                    onTap: () =>
+                        _doseEstimateKey.currentState?.newEstimate(),
+                  ),
+                  _TopbarAction(
                     label: 'Load',
                     icon: Icons.folder_outlined,
                     onTap: () => _doseEstimateKey.currentState?.loadFromFile(),
@@ -2508,6 +2514,60 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     }
 
     return true;
+  }
+
+  Future<void> newEstimate() async {
+    final hasContent =
+        tasks.isNotEmpty ||
+        workOrderController.text.isNotEmpty ||
+        dateController.text.isNotEmpty ||
+        descriptionController.text.isNotEmpty;
+
+    if (hasContent) {
+      final action = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('New Estimate'),
+          content: const Text(
+            'Do you want to save the current estimate before starting a new one?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'cancel'),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, 'discard'),
+              child: const Text('Discard'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, 'save'),
+              child: const Text('Save first'),
+            ),
+          ],
+        ),
+      );
+      if (action == null || action == 'cancel') return;
+      if (action == 'save') {
+        saveToFile();
+        // Give the save dialog a moment to appear before clearing
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
+
+    setState(() {
+      for (final t in tasks) {
+        t.disposeControllers();
+      }
+      tasks = [];
+      _activeIdx = -1;
+      workOrderController.clear();
+      dateController.clear();
+      descriptionController.clear();
+      triggerOverrides = {};
+      overrideJustifications = {};
+    });
+    widget.containmentKey?.currentState?.resetState();
   }
 
   // ─── PDF color palette ─────────────────────────────────────────────────────
@@ -5828,6 +5888,18 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   .toList(),
                               onSelected: (v) {
                                 t.mpifC = v ?? 0.0;
+                                // Auto-suggest PFE only if user hasn't
+                                // already picked a non-default value
+                                if (v != null && t.pfe == 1.0) {
+                                  // open bench / bagged → no controls
+                                  // fume hood → Type I (1,000)
+                                  // enhanced fume hood / glovebox → Type II
+                                  t.pfe = (v >= 10.0)
+                                      ? 1.0
+                                      : (v == 1.0)
+                                      ? 1000.0
+                                      : 100000.0;
+                                }
                                 setState(() {});
                               },
                             ),

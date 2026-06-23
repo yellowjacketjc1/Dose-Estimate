@@ -224,6 +224,36 @@ class ContainmentTabState extends State<ContainmentTab>
     super.dispose();
   }
 
+  void resetState() {
+    setState(() {
+      for (final e in sourceTerm) {
+        e.dispose();
+      }
+      sourceTerm = [];
+      selectedConfinement = confinementTypes[4];
+      selectedForm = physicalFormTypes[2];
+      selectedPifRelease = pifReleaseTypes[2];
+      selectedOccupancy = occupancyTypes[1];
+      selectedDispersibility = dispersibilityTypes[0];
+      selectedSpecialForm = specialFormTypes[0];
+      faController.text = selectedConfinement!.defaultFa.toString();
+      frController.text = selectedForm!.defaultFr.toString();
+      totalActivityController.clear();
+      volumeController.text = '2.0E8';
+      mixingController.text = '0.6';
+      uncertaintyController.text = '1';
+      contaminationController.clear();
+      areaController.clear();
+      calculatedResult = null;
+      isSufficient = null;
+      pifResult = null;
+      bioassayThreshold = null;
+      bioassayRequired = null;
+      useContaminationInput = false;
+    });
+    addNuclideRow();
+  }
+
   /// Pre-fills the source term with nuclide names from the dose estimate.
   /// Only runs if the source term is currently empty or all-blank; won't
   /// overwrite work the user has already entered.
