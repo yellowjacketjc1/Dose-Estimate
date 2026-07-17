@@ -21,7 +21,6 @@ class NuclideData {
     "Au-195": 4e-7, // (S)
     "Au-198": 5e-7, // (F/S)
     "Au-199": 7e-7, // (S)
-
     // B
     "Ba-131": 1e-6,
     "Ba-133": 3e-7,
@@ -34,7 +33,6 @@ class NuclideData {
     "Bi-212": 8e-9, // (M)
     "Bk-249": 1e-9,
     "Br-82": 3e-7, // (F/M)
-
     // C
     "C-11": 1e-4, // (Vapor)
     "C-14": 9e-7, // (Vapor)
@@ -78,7 +76,6 @@ class NuclideData {
     "Cs-137": 8e-8,
     "Cu-64": 3e-6, // (M/S)
     "Cu-67": 9e-7, // (S)
-
     // D
     "Dy-159": 2e-6,
     "Dy-165": 6e-6,
@@ -97,7 +94,6 @@ class NuclideData {
     "Fe-52": 5e-7, // (F)
     "Fe-55": 6e-7, // (F)
     "Fe-59": 1e-7, // (F/M)
-
     // G
     "Ga-67": 2e-6, // (M)
     "Ga-68": 4e-6, // (M)
@@ -110,7 +106,6 @@ class NuclideData {
     "Gd-159": 1e-6, // (M)
     "Ge-68": 7e-8, // (M)
     "Ge-71": 5e-5, // (F/M)
-
     // H
     "H-3": 2e-5, // (Water)
     "Hf-172": 6e-9, // (F)
@@ -139,7 +134,6 @@ class NuclideData {
     "Ir-190": 2e-7, // (M/S)
     "Ir-192": 1e-7, // (M/S)
     "Ir-194": 7e-7, // (F/S)
-
     // K
     "K-40": 1e-7,
     "K-42": 2e-6,
@@ -154,7 +148,6 @@ class NuclideData {
     "Kr-85m": 3e-5, // (Immersion)
     "Kr-87": 4e-6, // (Immersion)
     "Kr-88": 2e-6, // (Immersion)
-
     // L
     "La-137": 4e-8, // (F)
     "La-140": 3e-7, // (M)
@@ -163,7 +156,6 @@ class NuclideData {
     "Lu-174": 9e-8, // (F)
     "Lu-174m": 2e-7, // (F/M)
     "Lu-177": 5e-7, // (F/M)
-
     // M
     "Mn-52": 2e-7, // (F/M)
     "Mn-53": 5e-6, // (M)
@@ -171,7 +163,6 @@ class NuclideData {
     "Mn-56": 2e-6, // (F/M)
     "Mo-93": 2e-7, // (F)
     "Mo-99": 5e-7, // (M)
-
     // N
     "Na-22": 2e-7,
     "Na-24": 4e-7,
@@ -197,7 +188,6 @@ class NuclideData {
     "Os-191": 3e-7, // (S)
     "Os-191m": 4e-6, // (F)
     "Os-193": 8e-7, // (M/S)
-
     // P
     "P-32": 1e-7, // (M)
     "P-33": 4e-7, // (M)
@@ -237,7 +227,6 @@ class NuclideData {
     "Pu-241": 2e-10, // (W)
     "Pu-242": 5e-12, // (W)
     "Pu-244": 5e-12, // (W)
-
     // R
     "Ra-223": 9e-11,
     "Ra-224": 2e-10,
@@ -268,7 +257,6 @@ class NuclideData {
     "Ru-103": 2e-7, // (M/S)
     "Ru-105": 2e-6, // (F/M/S)
     "Ru-106": 1e-8, // (S)
-
     // S
     "S-35": 5e-7, // (M)
     "Sb-122": 4e-7, // (M)
@@ -305,7 +293,6 @@ class NuclideData {
     "Sr-90": 7e-9, // (M)
     "Sr-91": 9e-7, // (M)
     "Sr-92": 1e-6, // (M)
-
     // T
     "Ta-178": 3e-6,
     "Ta-179": 1e-6, // (M)
@@ -363,11 +350,9 @@ class NuclideData {
     "U-238": 8e-11, // (S)
     "U-239": 9e-6, // (M/S)
     "U-240": 6e-7, // (S)
-
     // V
     "V-48": 2e-7, // (F/M)
     "V-49": 1e-5, // (M)
-
     // W
     "W-178": 3e-6,
     "W-181": 1e-5,
@@ -389,7 +374,6 @@ class NuclideData {
     "Xe-135": 2e-5, // (Immersion)
     "Xe-135m": 1e-5, // (Immersion)
     "Xe-138": 3e-6, // (Immersion)
-
     // Y
     "Y-86": 4e-7, // (M/S)
     "Y-87": 8e-7, // (S)
@@ -401,7 +385,6 @@ class NuclideData {
     "Y-93": 9e-7, // (M/S)
     "Yb-169": 2e-7, // (M/S)
     "Yb-175": 8e-7, // (M/S)
-
     // Z
     "Zn-62": 8e-7, // (S)
     "Zn-63": 5e-6, // (S)
@@ -413,10 +396,9 @@ class NuclideData {
     "Zr-93": 3e-9, // (F)
     "Zr-95": 9e-8, // (F)
     "Zr-97": 4e-7, // (M/S)
-
     // Default
     "Other": 2e-13, // (Alpha/SF Default)
-    "Other_Noble_Gas_lt_2h": 1e-6 // (Default for unlisted noble gas <2h)
+    "Other_Noble_Gas_lt_2h": 1e-6, // (Default for unlisted noble gas <2h)
   };
   static double getDac(String name) {
     return dacValues[name] ?? 2e-13; // Default to Other if not found
@@ -429,6 +411,6 @@ class NuclideData {
     'Cs-137',
     'Co-60',
     'U-nat',
-    'Other'
+    'Other',
   ];
 }

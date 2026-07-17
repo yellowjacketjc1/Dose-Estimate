@@ -47,3 +47,6 @@ app.*.map.json
 # Local QA artifacts
 /742 QA/
 /test/qa_smoke_test.dart
+
+# Browser-automation session artifacts
+.playwright-mcp/

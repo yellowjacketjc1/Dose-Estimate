@@ -11,18 +11,25 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'containment.dart';
 import 'file_download_stub.dart'
-    if (dart.library.html) 'file_download_web.dart'
+    if (dart.library.js_interop) 'file_download_web.dart'
     as file_download;
 import 'qa_loader_stub.dart'
-    if (dart.library.html) 'qa_loader_web.dart'
+    if (dart.library.js_interop) 'qa_loader_web.dart'
     as qa_loader;
 import 'nuclides.dart';
+import 'models/task_data.dart';
+import 'calc/dose_calculator.dart' as calc;
 import 'package:flutter_math_fork/flutter_math.dart';
+
+// Re-export the models so existing importers of main.dart (e.g. tests)
+// keep compiling.
+export 'models/task_data.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   Map<String, dynamic>? initialState;
+  String? qaLoadError;
   final initialTab = Uri.base.queryParameters['tab'] == 'containment' ? 1 : 0;
 
   if (kIsWeb) {
@@ -31,13 +38,20 @@ Future<void> main() async {
       try {
         final fileContent = await qa_loader.loadQaFile(fileName);
         initialState = jsonDecode(fileContent) as Map<String, dynamic>;
-      } catch (_) {
+      } catch (e) {
         initialState = null;
+        qaLoadError = 'Could not load QA file "$fileName": $e';
       }
     }
   }
 
-  runApp(DoseEstimateApp(initialState: initialState, initialTab: initialTab));
+  runApp(
+    DoseEstimateApp(
+      initialState: initialState,
+      initialTab: initialTab,
+      qaLoadError: qaLoadError,
+    ),
+  );
 }
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -53,8 +67,6 @@ const _kInk2 = Color(0xFF3D3C38);
 const _kInk3 = Color(0xFF6B6A63);
 const _kInk4 = Color(0xFF9A9892);
 const _kAccent = Color(0xFF2B4B7A); // deep navy-blue
-const _kAccentInk = Color(0xFF203A60);
-const _kAccentWash = Color(0xFFEAF0F9);
 const _kOk = Color(0xFF2E7D4F);
 const _kOkWash = Color(0xFFE8F2EB);
 const _kWarn = Color(0xFFB5711F);
@@ -187,10 +199,17 @@ ThemeData _buildTheme(Brightness brightness) {
 }
 
 // ─── Version / update checker ────────────────────────────────────────────────
-const String _kAppVersion = '1.1.0-beta';
+const String _kAppVersion = '1.2.0-beta';
 const String _kGitHubRepo = 'yellowjacketjc1/Dose-Estimate';
 
-enum _UpdateStatus { idle, checking, upToDate, updateAvailable, downloading, error }
+enum _UpdateStatus {
+  idle,
+  checking,
+  upToDate,
+  updateAvailable,
+  downloading,
+  error,
+}
 
 class _UpdateResult {
   final _UpdateStatus status;
@@ -199,7 +218,8 @@ class _UpdateResult {
   final String? assetDownloadUrl;
   final String? assetName;
   final String? errorMessage;
-  const _UpdateResult(this.status, {
+  const _UpdateResult(
+    this.status, {
     this.latestVersion,
     this.releaseUrl,
     this.assetDownloadUrl,
@@ -210,7 +230,9 @@ class _UpdateResult {
 
 /// Strips leading 'v' and '-beta'/'-alpha' suffixes for numeric comparison.
 List<int> _parseVersion(String v) {
-  final clean = v.replaceFirst(RegExp(r'^v'), '').replaceAll(RegExp(r'[-+].*$'), '');
+  final clean = v
+      .replaceFirst(RegExp(r'^v'), '')
+      .replaceAll(RegExp(r'[-+].*$'), '');
   return clean.split('.').map((p) => int.tryParse(p) ?? 0).toList();
 }
 
@@ -229,13 +251,17 @@ bool _isNewerVersion(String remote, String current) {
 Future<_UpdateResult> _checkForUpdate() async {
   try {
     // Fetch all releases so pre-releases are included
-    final uri = Uri.parse('https://api.github.com/repos/$_kGitHubRepo/releases');
+    final uri = Uri.parse(
+      'https://api.github.com/repos/$_kGitHubRepo/releases',
+    );
     final response = await http
         .get(uri, headers: {'Accept': 'application/vnd.github+json'})
         .timeout(const Duration(seconds: 10));
     if (response.statusCode != 200) {
-      return _UpdateResult(_UpdateStatus.error,
-          errorMessage: 'Server returned ${response.statusCode}');
+      return _UpdateResult(
+        _UpdateStatus.error,
+        errorMessage: 'Server returned ${response.statusCode}',
+      );
     }
     final releases = jsonDecode(response.body) as List<dynamic>;
     if (releases.isEmpty) return const _UpdateResult(_UpdateStatus.upToDate);
@@ -243,7 +269,8 @@ Future<_UpdateResult> _checkForUpdate() async {
     // Pick the most recent release (first in list)
     final latest = releases.first as Map<String, dynamic>;
     final tag = (latest['tag_name'] as String? ?? '');
-    final releaseUrl = latest['html_url'] as String? ??
+    final releaseUrl =
+        latest['html_url'] as String? ??
         'https://github.com/$_kGitHubRepo/releases';
 
     if (tag.isEmpty || !_isNewerVersion(tag, _kAppVersion)) {
@@ -252,9 +279,12 @@ Future<_UpdateResult> _checkForUpdate() async {
 
     // Find the first .exe asset
     final assets = (latest['assets'] as List<dynamic>? ?? []);
-    final exeAsset = assets.cast<Map<String, dynamic>>().where(
-      (a) => (a['name'] as String? ?? '').toLowerCase().endsWith('.exe'),
-    ).firstOrNull;
+    final exeAsset = assets
+        .cast<Map<String, dynamic>>()
+        .where(
+          (a) => (a['name'] as String? ?? '').toLowerCase().endsWith('.exe'),
+        )
+        .firstOrNull;
 
     return _UpdateResult(
       _UpdateStatus.updateAvailable,
@@ -330,8 +360,12 @@ class _AboutDialogState extends State<_AboutDialog> {
       await sink.close();
 
       // Launch installer and exit
-      await Process.start(savePath, [], runInShell: false,
-          mode: ProcessStartMode.detached);
+      await Process.start(
+        savePath,
+        [],
+        runInShell: false,
+        mode: ProcessStartMode.detached,
+      );
       exit(0);
     } catch (e) {
       if (mounted) {
@@ -361,8 +395,11 @@ class _AboutDialogState extends State<_AboutDialog> {
         updateWidget = const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            SizedBox(width: 16, height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2)),
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
             SizedBox(width: 10),
             Text('Checking…'),
           ],
@@ -385,13 +422,16 @@ class _AboutDialogState extends State<_AboutDialog> {
               children: [
                 Icon(Icons.new_releases_outlined, size: 18, color: _kWarn),
                 const SizedBox(width: 8),
-                Text('Version $_latestVersion available',
-                    style: TextStyle(
-                        color: _kWarn, fontWeight: FontWeight.w600)),
+                Text(
+                  'Version $_latestVersion available',
+                  style: TextStyle(color: _kWarn, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
             const SizedBox(height: 10),
-            if (_assetDownloadUrl != null)
+            // The installer asset is a Windows .exe — only offer in-app
+            // install on Windows desktop; elsewhere link to the release page.
+            if (_assetDownloadUrl != null && !kIsWeb && Platform.isWindows)
               FilledButton.icon(
                 onPressed: _downloadAndInstall,
                 icon: const Icon(Icons.download_outlined, size: 16),
@@ -411,8 +451,10 @@ class _AboutDialogState extends State<_AboutDialog> {
         updateWidget = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Downloading update…',
-                style: TextStyle(fontSize: 13, color: ink3)),
+            Text(
+              'Downloading update…',
+              style: TextStyle(fontSize: 13, color: ink3),
+            ),
             const SizedBox(height: 10),
             LinearProgressIndicator(value: _downloadProgress),
             if (_downloadProgress != null)
@@ -424,8 +466,10 @@ class _AboutDialogState extends State<_AboutDialog> {
                 ),
               ),
             const SizedBox(height: 6),
-            Text('The installer will launch automatically.\nThe app will close.',
-                style: TextStyle(fontSize: 11, color: ink3)),
+            Text(
+              'The installer will launch automatically.\nThe app will close.',
+              style: TextStyle(fontSize: 11, color: ink3),
+            ),
           ],
         );
       case _UpdateStatus.error:
@@ -469,13 +513,19 @@ class _AboutDialogState extends State<_AboutDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Version $_kAppVersion',
-                style: TextStyle(fontSize: 13, color: ink3)),
+            Text(
+              'Version $_kAppVersion',
+              style: TextStyle(fontSize: 13, color: ink3),
+            ),
             const SizedBox(height: 4),
-            Text('Built by Jesse Coyle',
-                style: TextStyle(fontSize: 12, color: ink3)),
-            Text('github.com/$_kGitHubRepo',
-                style: TextStyle(fontSize: 11, color: ink3)),
+            Text(
+              'Built by Jesse Coyle',
+              style: TextStyle(fontSize: 12, color: ink3),
+            ),
+            Text(
+              'github.com/$_kGitHubRepo',
+              style: TextStyle(fontSize: 11, color: ink3),
+            ),
             const Divider(height: 24),
             updateWidget,
           ],
@@ -484,8 +534,9 @@ class _AboutDialogState extends State<_AboutDialog> {
       actions: [
         if (_status != _UpdateStatus.downloading)
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
       ],
     );
   }
@@ -582,7 +633,13 @@ class _SplashScreenState extends State<_SplashScreen>
 class DoseEstimateApp extends StatefulWidget {
   final Map<String, dynamic>? initialState;
   final int initialTab;
-  const DoseEstimateApp({super.key, this.initialState, this.initialTab = 0});
+  final String? qaLoadError;
+  const DoseEstimateApp({
+    super.key,
+    this.initialState,
+    this.initialTab = 0,
+    this.qaLoadError,
+  });
 
   @override
   State<DoseEstimateApp> createState() => _DoseEstimateAppState();
@@ -614,6 +671,7 @@ class _DoseEstimateAppState extends State<DoseEstimateApp> {
               themeMode: _themeMode,
               initialState: widget.initialState,
               initialTab: widget.initialTab,
+              qaLoadError: widget.qaLoadError,
             ),
       debugShowCheckedModeBanner: false,
     );
@@ -625,12 +683,14 @@ class MainScreen extends StatefulWidget {
   final ThemeMode themeMode;
   final Map<String, dynamic>? initialState;
   final int initialTab;
+  final String? qaLoadError;
   const MainScreen({
     super.key,
     required this.onToggleTheme,
     required this.themeMode,
     this.initialState,
     this.initialTab = 0,
+    this.qaLoadError,
   });
 
   @override
@@ -647,6 +707,17 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _tab = widget.initialTab;
     _silentUpdateCheck();
+    if (widget.qaLoadError != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(widget.qaLoadError!),
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      });
+    }
   }
 
   Future<void> _silentUpdateCheck() async {
@@ -673,200 +744,229 @@ class _MainScreenState extends State<MainScreen> {
     final hairline = isDark ? _kDarkHairline : _kHairline;
     final ink1 = isDark ? _kDarkInk1 : _kInk1;
     final ink3 = isDark ? _kDarkInk3 : _kInk3;
-    final ink4 = isDark ? _kDarkInk4 : _kInk4;
     final bg = isDark ? _kDarkBg : _kBg;
 
     return Scaffold(
       backgroundColor: bg,
-      body: Column(
-        children: [
-          // ── Topbar ────────────────────────────────────────────────────────
-          Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: surface,
-              border: Border(bottom: BorderSide(color: hairline)),
-            ),
-            child: Row(
-              children: [
-                // Brand mark
-                Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 10),
-                  child: Row(
-                    children: [
-                      Image.asset(
-                        'assets/app_icon.png',
-                        width: 32,
-                        height: 32,
+      body: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () =>
+              _doseEstimateKey.currentState?.saveToFile(),
+          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () =>
+              _doseEstimateKey.currentState?.saveToFile(),
+          const SingleActivator(LogicalKeyboardKey.keyO, control: true): () =>
+              _doseEstimateKey.currentState?.loadFromFile(),
+          const SingleActivator(LogicalKeyboardKey.keyO, meta: true): () =>
+              _doseEstimateKey.currentState?.loadFromFile(),
+          const SingleActivator(LogicalKeyboardKey.keyP, control: true): () =>
+              _tab == 0
+              ? _doseEstimateKey.currentState?.printSummaryReport()
+              : _containmentKey.currentState?.printContainmentReport(),
+          const SingleActivator(LogicalKeyboardKey.keyP, meta: true): () =>
+              _tab == 0
+              ? _doseEstimateKey.currentState?.printSummaryReport()
+              : _containmentKey.currentState?.printContainmentReport(),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Column(
+            children: [
+              // ── Topbar ────────────────────────────────────────────────────────
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: surface,
+                  border: Border(bottom: BorderSide(color: hairline)),
+                ),
+                child: Row(
+                  children: [
+                    // Brand mark
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, right: 10),
+                      child: Row(
+                        children: [
+                          Image.asset(
+                            'assets/app_icon.png',
+                            width: 32,
+                            height: 32,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Dose Assessment',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: ink1,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Dose Assessment',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: ink1,
-                          letterSpacing: -0.2,
-                        ),
+                    ),
+
+                    // Tab buttons
+                    Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Row(
+                        children: [
+                          _TopbarTab(
+                            label: 'Dose Estimate',
+                            icon: Icons.show_chart,
+                            active: _tab == 0,
+                            count: _doseEstimateKey.currentState?.tasks.length,
+                            onTap: () => setState(() => _tab = 0),
+                          ),
+                          const SizedBox(width: 4),
+                          _TopbarTab(
+                            label: 'Containment Analysis',
+                            icon: Icons.shield_outlined,
+                            active: _tab == 1,
+                            onTap: () {
+                              setState(() => _tab = 1);
+                              // Auto-populate containment nuclides from dose estimate
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                final doseState = _doseEstimateKey.currentState;
+                                final contState = _containmentKey.currentState;
+                                if (doseState != null && contState != null) {
+                                  final names = doseState.tasks
+                                      .expand((t) => t.nuclides)
+                                      .map((n) => n.name ?? '')
+                                      .where((n) => n.isNotEmpty)
+                                      .toSet()
+                                      .toList();
+                                  contState.populateNuclides(names);
+                                  // Use the most common non-zero C factor across tasks
+                                  final cValues = doseState.tasks
+                                      .map((t) => t.mpifC)
+                                      .where((c) => c > 0)
+                                      .toList();
+                                  if (cValues.isNotEmpty) {
+                                    final mostCommonC = cValues
+                                        .fold<Map<double, int>>({}, (m, c) {
+                                          m[c] = (m[c] ?? 0) + 1;
+                                          return m;
+                                        })
+                                        .entries
+                                        .reduce(
+                                          (a, b) => a.value >= b.value ? a : b,
+                                        )
+                                        .key;
+                                    contState.suggestConfinement(mostCommonC);
+                                  }
+                                }
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const Spacer(),
+
+                    // Action buttons
+                    if (_tab == 0) ...[
+                      _TopbarAction(
+                        label: 'New',
+                        icon: Icons.add_circle_outline,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.newEstimate(),
+                      ),
+                      _TopbarAction(
+                        label: 'Load',
+                        icon: Icons.folder_outlined,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.loadFromFile(),
+                      ),
+                      _TopbarAction(
+                        label: 'Save',
+                        icon: Icons.save_outlined,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.saveToFile(),
+                      ),
+                      _TopbarAction(
+                        label: 'Print',
+                        icon: Icons.print_outlined,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.printSummaryReport(),
                       ),
                     ],
-                  ),
-                ),
-
-                // Tab buttons
-                Padding(
-                  padding: const EdgeInsets.only(left: 12),
-                  child: Row(
-                    children: [
-                      _TopbarTab(
-                        label: 'Dose Estimate',
-                        icon: Icons.show_chart,
-                        active: _tab == 0,
-                        count: _doseEstimateKey.currentState?.tasks.length,
-                        onTap: () => setState(() => _tab = 0),
+                    if (_tab == 1) ...[
+                      _TopbarAction(
+                        label: 'Load',
+                        icon: Icons.folder_outlined,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.loadFromFile(),
                       ),
-                      const SizedBox(width: 4),
-                      _TopbarTab(
-                        label: 'Containment Analysis',
-                        icon: Icons.shield_outlined,
-                        active: _tab == 1,
-                        onTap: () {
-                          setState(() => _tab = 1);
-                          // Auto-populate containment nuclides from dose estimate
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            final doseState = _doseEstimateKey.currentState;
-                            final contState = _containmentKey.currentState;
-                            if (doseState != null && contState != null) {
-                              final names = doseState.tasks
-                                  .expand((t) => t.nuclides)
-                                  .map((n) => n.name ?? '')
-                                  .where((n) => n.isNotEmpty)
-                                  .toSet()
-                                  .toList();
-                              contState.populateNuclides(names);
-                              // Use the most common non-zero C factor across tasks
-                              final cValues = doseState.tasks
-                                  .map((t) => t.mpifC)
-                                  .where((c) => c > 0)
-                                  .toList();
-                              if (cValues.isNotEmpty) {
-                                final mostCommonC = cValues
-                                    .fold<Map<double, int>>({}, (m, c) {
-                                      m[c] = (m[c] ?? 0) + 1;
-                                      return m;
-                                    })
-                                    .entries
-                                    .reduce((a, b) => a.value >= b.value ? a : b)
-                                    .key;
-                                contState.suggestConfinement(mostCommonC);
-                              }
-                            }
-                          });
-                        },
+                      _TopbarAction(
+                        label: 'Save',
+                        icon: Icons.save_outlined,
+                        onTap: () =>
+                            _doseEstimateKey.currentState?.saveToFile(),
+                      ),
+                      _TopbarAction(
+                        label: 'Print',
+                        icon: Icons.print_outlined,
+                        onTap: () => _containmentKey.currentState
+                            ?.printContainmentReport(),
                       ),
                     ],
-                  ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.info_outline, size: 16),
+                      style: IconButton.styleFrom(
+                        foregroundColor: ink3,
+                        padding: const EdgeInsets.all(6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => _showAboutDialog(context),
+                      tooltip: 'About / Check for Updates',
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(
+                        isDark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        size: 16,
+                      ),
+                      style: IconButton.styleFrom(
+                        foregroundColor: ink3,
+                        padding: const EdgeInsets.all(6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: widget.onToggleTheme,
+                      tooltip: isDark ? 'Light mode' : 'Dark mode',
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                 ),
+              ),
 
-                const Spacer(),
-
-                // Action buttons
-                if (_tab == 0) ...[
-                  _TopbarAction(
-                    label: 'New',
-                    icon: Icons.add_circle_outline,
-                    onTap: () =>
-                        _doseEstimateKey.currentState?.newEstimate(),
-                  ),
-                  _TopbarAction(
-                    label: 'Load',
-                    icon: Icons.folder_outlined,
-                    onTap: () => _doseEstimateKey.currentState?.loadFromFile(),
-                  ),
-                  _TopbarAction(
-                    label: 'Save',
-                    icon: Icons.save_outlined,
-                    onTap: () => _doseEstimateKey.currentState?.saveToFile(),
-                  ),
-                  _TopbarAction(
-                    label: 'Print',
-                    icon: Icons.print_outlined,
-                    onTap: () =>
-                        _doseEstimateKey.currentState?.printSummaryReport(),
-                  ),
-                ],
-                if (_tab == 1) ...[
-                  _TopbarAction(
-                    label: 'Load',
-                    icon: Icons.folder_outlined,
-                    onTap: () => _doseEstimateKey.currentState?.loadFromFile(),
-                  ),
-                  _TopbarAction(
-                    label: 'Save',
-                    icon: Icons.save_outlined,
-                    onTap: () => _doseEstimateKey.currentState?.saveToFile(),
-                  ),
-                  _TopbarAction(
-                    label: 'Print',
-                    icon: Icons.print_outlined,
-                    onTap: () =>
-                        _containmentKey.currentState?.printContainmentReport(),
-                  ),
-                ],
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.info_outline, size: 16),
-                  style: IconButton.styleFrom(
-                    foregroundColor: ink3,
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () => _showAboutDialog(context),
-                  tooltip: 'About / Check for Updates',
+              // ── Main content ──────────────────────────────────────────────────
+              Expanded(
+                child: IndexedStack(
+                  index: _tab,
+                  children: [
+                    DoseEstimateScreen(
+                      key: _doseEstimateKey,
+                      onTaskCountChanged: () => setState(() {}),
+                      containmentKey: _containmentKey,
+                      initialState: widget.initialState,
+                    ),
+                    ContainmentTab(
+                      key: _containmentKey,
+                      onLoad: () =>
+                          _doseEstimateKey.currentState?.loadFromFile(),
+                      onSave: () => _doseEstimateKey.currentState?.saveToFile(),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: Icon(
-                    isDark
-                        ? Icons.light_mode_outlined
-                        : Icons.dark_mode_outlined,
-                    size: 16,
-                  ),
-                  style: IconButton.styleFrom(
-                    foregroundColor: ink3,
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: widget.onToggleTheme,
-                  tooltip: isDark ? 'Light mode' : 'Dark mode',
-                ),
-                const SizedBox(width: 12),
-              ],
-            ),
+              ),
+            ],
           ),
-
-          // ── Main content ──────────────────────────────────────────────────
-          Expanded(
-            child: IndexedStack(
-              index: _tab,
-              children: [
-                DoseEstimateScreen(
-                  key: _doseEstimateKey,
-                  onTaskCountChanged: () => setState(() {}),
-                  containmentKey: _containmentKey,
-                  initialState: widget.initialState,
-                ),
-                ContainmentTab(
-                  key: _containmentKey,
-                  onLoad: () => _doseEstimateKey.currentState?.loadFromFile(),
-                  onSave: () => _doseEstimateKey.currentState?.saveToFile(),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -921,7 +1021,7 @@ class _TopbarTab extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                 decoration: BoxDecoration(
-                  color: active ? Colors.white.withOpacity(0.14) : surf3,
+                  color: active ? Colors.white.withValues(alpha: 0.14) : surf3,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -1018,7 +1118,7 @@ class _MiniStat extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -1028,7 +1128,9 @@ class _MiniStat extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+              color: Theme.of(
+                context,
+              ).colorScheme.onSurface.withValues(alpha: 0.5),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -1044,7 +1146,10 @@ class _MiniStat extends StatelessWidget {
           if (unit != null)
             Text(
               unit!,
-              style: TextStyle(fontSize: 10, color: color.withOpacity(0.7)),
+              style: TextStyle(
+                fontSize: 10,
+                color: color.withValues(alpha: 0.7),
+              ),
             ),
         ],
       ),
@@ -1083,9 +1188,9 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1107,7 +1212,7 @@ class _StatusBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             triggered ? 'Required' : 'Clear',
-            style: TextStyle(fontSize: 11, color: color.withOpacity(0.8)),
+            style: TextStyle(fontSize: 11, color: color.withValues(alpha: 0.8)),
           ),
         ],
       ),
@@ -1125,12 +1230,16 @@ class _InfoNote extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _kAccent.withOpacity(0.07),
+        color: _kAccent.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline, size: 15, color: _kAccent.withOpacity(0.7)),
+          Icon(
+            Icons.info_outline,
+            size: 15,
+            color: _kAccent.withValues(alpha: 0.7),
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1139,7 +1248,7 @@ class _InfoNote extends StatelessWidget {
                 fontSize: 12,
                 color: Theme.of(
                   context,
-                ).colorScheme.onSurface.withOpacity(0.65),
+                ).colorScheme.onSurface.withValues(alpha: 0.65),
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -1153,13 +1262,17 @@ class _InfoNote extends StatelessWidget {
 // ─── Formula system ────────────────────────────────────────────────────────
 
 class _FormulaStep {
-  final String label;       // e.g. "Symbolic formula"
-  final String latex;       // LaTeX string
-  final String? comment;    // optional plain-text explanation
+  final String label; // e.g. "Symbolic formula"
+  final String latex; // LaTeX string
+  final String? comment; // optional plain-text explanation
   const _FormulaStep(this.label, this.latex, {this.comment});
 }
 
-void showFormulaDialog(BuildContext context, String title, List<_FormulaStep> steps) {
+void _showFormulaDialog(
+  BuildContext context,
+  String title,
+  List<_FormulaStep> steps,
+) {
   showDialog<void>(
     context: context,
     builder: (ctx) => Dialog(
@@ -1198,7 +1311,10 @@ class _FormulaDialog extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 20, 16, 0),
             child: Row(
               children: [
-                const Text('Σ', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Σ',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -1239,9 +1355,14 @@ class _FormulaDialog extends StatelessWidget {
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF5F5F7),
+                        color: isDark
+                            ? const Color(0xFF2C2C2E)
+                            : const Color(0xFFF5F5F7),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Math.tex(
@@ -1285,6 +1406,7 @@ class _CollapsibleSection extends StatefulWidget {
   final ValueChanged<String>? onNotesChanged;
   final VoidCallback? onShowFormula;
   const _CollapsibleSection({
+    super.key,
     required this.title,
     required this.initiallyExpanded,
     required this.onExpansionChanged,
@@ -1321,11 +1443,11 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
     final hasNotes = (widget.notes ?? '').isNotEmpty;
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1C1C1E) : Colors.white,
+        // Warm-gray design tokens — keep in step with the rest of the app
+        // (this previously used a cool iOS-gray set that visibly mismatched).
+        color: isDark ? _kDarkSurface : _kSurface,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA),
-        ),
+        border: Border.all(color: isDark ? _kDarkHairline : _kHairline),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -1359,7 +1481,9 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                 message: hasNotes ? 'Notes (has content)' : 'Add notes',
                 child: IconButton(
                   icon: Icon(
-                    hasNotes ? Icons.sticky_note_2 : Icons.sticky_note_2_outlined,
+                    hasNotes
+                        ? Icons.sticky_note_2
+                        : Icons.sticky_note_2_outlined,
                     size: 18,
                     color: hasNotes ? _kAccent : null,
                   ),
@@ -1384,7 +1508,10 @@ class _CollapsibleSectionState extends State<_CollapsibleSection> {
                 maxLines: null,
                 decoration: InputDecoration(
                   hintText: 'Assumptions / notes for this section…',
-                  prefixIcon: const Icon(Icons.sticky_note_2_outlined, size: 18),
+                  prefixIcon: const Icon(
+                    Icons.sticky_note_2_outlined,
+                    size: 18,
+                  ),
                   suffixIcon: _notesController.text.isNotEmpty
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 16),
@@ -1485,189 +1612,118 @@ class _TriggerRow extends StatelessWidget {
   }
 }
 
-/// iOS-style segmented control tab bar
-class _SegmentedTabBar extends StatelessWidget {
-  final TabController controller;
-  final List<String> labels;
-  const _SegmentedTabBar({required this.controller, required this.labels});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFE5E5EA);
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return Container(
-          height: 36,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          padding: const EdgeInsets.all(2),
-          child: Row(
-            children: List.generate(labels.length, (i) {
-              final selected = controller.index == i;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => controller.animateTo(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeInOut,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? (isDark ? const Color(0xFF3A3A3C) : Colors.white)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.08),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: Center(
-                      child: Text(
-                        labels[i],
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: selected
-                              ? FontWeight.w600
-                              : FontWeight.w400,
-                          color: selected
-                              ? (isDark ? Colors.white : Colors.black)
-                              : (isDark
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class _WorkField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final VoidCallback onChanged;
+  final String? hint;
+
+  /// Marks the field as required, so its label shows an asterisk and its
+  /// box gets an accent ring while it's still empty.
+  final bool required;
+
+  /// Optional tap handler — used by the Date field to open a calendar
+  /// picker instead of free text entry.
+  final VoidCallback? onTap;
+  final bool readOnly;
   const _WorkField({
     required this.label,
     required this.controller,
     required this.onChanged,
+    this.hint,
+    this.required = false,
+    this.onTap,
+    this.readOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Padding(
-      padding: const EdgeInsets.only(right: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10.5,
-              color: _kInk4,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.08,
-            ),
-          ),
-          const SizedBox(height: 2),
-          IntrinsicWidth(
-            child: TextField(
-              controller: controller,
-              onChanged: (_) => onChanged(),
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: isDark ? _kDarkInk1 : _kInk1,
-              ),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final surface = isDark ? _kDarkSurface : _kSurface;
+    final hairline = isDark ? _kDarkHairline : _kHairline;
+    final isEmpty = controller.text.trim().isEmpty;
+    // Nudge the user toward required-but-empty fields with an accent ring.
+    final borderColor = (required && isEmpty) ? _kAccent : hairline;
 
-class _WorkFieldRaw extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final VoidCallback onChanged;
-  const _WorkFieldRaw({
-    required this.label,
-    required this.controller,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 10.5,
-            color: _kInk4,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.08,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: isDark ? _kDarkInk4 : _kInk4,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.08,
+                ),
+              ),
+            ),
+            if (required)
+              Text(
+                ' *',
+                style: TextStyle(
+                  fontSize: 10.5,
+                  color: _kAccent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+          ],
         ),
-        const SizedBox(height: 2),
-        TextField(
-          controller: controller,
-          onChanged: (_) => onChanged(),
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? _kDarkInk1 : _kInk1,
+        const SizedBox(height: 4),
+        Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(7),
+            border: Border.all(color: borderColor),
           ),
-          decoration: const InputDecoration(
-            border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            filled: false,
-            isDense: true,
-            contentPadding: EdgeInsets.zero,
+          child: TextField(
+            controller: controller,
+            onChanged: (_) => onChanged(),
+            readOnly: readOnly,
+            onTap: onTap,
+            mouseCursor: onTap != null ? SystemMouseCursors.click : null,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: isDark ? _kDarkInk1 : _kInk1,
+            ),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: isDark ? _kDarkInk4 : _kInk4,
+              ),
+              suffixIcon: onTap != null
+                  ? Icon(
+                      Icons.calendar_today_outlined,
+                      size: 15,
+                      color: isDark ? _kDarkInk4 : _kInk4,
+                    )
+                  : null,
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 34,
+                minHeight: 34,
+              ),
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              filled: false,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 9,
+              ),
+            ),
           ),
         ),
       ],
-    );
-  }
-}
-
-class _WorkDivider extends StatelessWidget {
-  final Color color;
-  const _WorkDivider({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 36,
-      color: color,
-      margin: const EdgeInsets.symmetric(horizontal: 0),
     );
   }
 }
@@ -1686,29 +1742,27 @@ class _NonNegativeFormatter extends TextInputFormatter {
   }
 }
 
-class _MaxValueFormatter extends TextInputFormatter {
-  final double max;
-  const _MaxValueFormatter(this.max);
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    if (newValue.text.isEmpty) return newValue;
-    final v = double.tryParse(newValue.text);
-    if (v != null && v > max) return oldValue;
-    return newValue;
-  }
-}
-
 // Returns an InputDecoration with error styling when [isNegative] is true.
-InputDecoration _numericDecoration(InputDecoration base, bool isNegative) {
-  if (!isNegative) return base;
-  return base.copyWith(
-    errorText: 'Must be ≥ 0',
-    errorStyle: const TextStyle(fontSize: 11),
-  );
+InputDecoration _numericDecoration(
+  InputDecoration base,
+  bool isNegative, [
+  String? rawText,
+]) {
+  if (isNegative) {
+    return base.copyWith(
+      errorText: 'Must be ≥ 0',
+      errorStyle: const TextStyle(fontSize: 11),
+    );
+  }
+  // Flag text that silently fails to parse (e.g. "1,000", "abc", "2-3").
+  final trimmed = rawText?.trim() ?? '';
+  if (trimmed.isNotEmpty && double.tryParse(trimmed) == null) {
+    return base.copyWith(
+      errorText: 'Invalid number',
+      errorStyle: const TextStyle(fontSize: 11),
+    );
+  }
+  return base;
 }
 
 class DoseEstimateScreen extends StatefulWidget {
@@ -1724,294 +1778,6 @@ class DoseEstimateScreen extends StatefulWidget {
 
   @override
   State<DoseEstimateScreen> createState() => DoseEstimateScreenState();
-}
-
-class TaskData {
-  String title;
-  String location;
-  int workers;
-  double hours;
-  double? mpifR; // null = not yet selected; 0.0 = encapsulated (R=0 is a valid selection)
-  double mpifC; // -1.0 = custom value; use mpifCCustom for actual value
-  double? mpifCCustom; // only used when mpifC == -1.0
-  double mpifD;
-  double mpifO;
-  double mpifS;
-  double mpifU;
-  double doseRate;
-  double pfr;
-  double pfe;
-  List<NuclideEntry> nuclides;
-  List<ExtremityEntry> extremities;
-
-  // Track expansion state for each section
-  Map<String, bool> sectionExpansionStates;
-
-  // Notes for each section (keyed by stateKey)
-  Map<String, String> sectionNotes;
-
-  // Persistent controllers so cursor/selection behavior remains stable
-  final TextEditingController titleController = TextEditingController();
-  final FocusNode titleFocusNode = FocusNode();
-  final TextEditingController locationController = TextEditingController();
-  final TextEditingController workersController = TextEditingController();
-  final TextEditingController hoursController = TextEditingController();
-  final TextEditingController mpifDController = TextEditingController();
-  final TextEditingController mpifSController = TextEditingController();
-  final TextEditingController mpifUController = TextEditingController();
-  final TextEditingController mpifCCustomController = TextEditingController();
-  final TextEditingController doseRateController = TextEditingController();
-
-  TaskData({
-    this.title = '',
-    this.location = '',
-    this.workers = 1,
-    this.hours = 1.0,
-    // null = not yet selected; 0.0 = encapsulated (R=0 explicitly chosen). UI requires selection before computing mPIF.
-    this.mpifR,
-    this.mpifC = 0.0,
-    this.mpifCCustom,
-    this.mpifD = 0.0,
-    this.mpifO = 1.0,
-    this.mpifS = 0.0,
-    this.mpifU = 0.0,
-    this.doseRate = 0.0,
-    this.pfr = 1.0,
-    this.pfe = 1.0,
-    List<NuclideEntry>? nuclides,
-    List<ExtremityEntry>? extremities,
-    Map<String, bool>? sectionExpansionStates,
-    Map<String, String>? sectionNotes,
-  }) : nuclides = nuclides ?? [NuclideEntry()],
-       extremities = extremities ?? [],
-       sectionExpansionStates =
-           sectionExpansionStates ??
-           {
-             'timeEstimation': true,
-             'mpifCalculation': false,
-             'externalDose': false,
-             'extremityDose': false,
-             'protectionFactors': false,
-             'internalDose': false,
-           },
-       sectionNotes = sectionNotes ?? {} {
-    titleController.text = title;
-    locationController.text = location;
-    workersController.text = workers.toString();
-    hoursController.text = hours.toString();
-    // Leave mPIF field controllers empty when value is 0.0 (not selected)
-    mpifDController.text = mpifD > 0.0 ? mpifD.toString() : '';
-    mpifSController.text = mpifS > 0.0 ? mpifS.toString() : '';
-    mpifUController.text = mpifU > 0.0 ? mpifU.toString() : '';
-    doseRateController.text = doseRate.toString();
-
-    // keep model fields in sync with controllers
-    titleController.addListener(() {
-      title = titleController.text;
-    });
-    locationController.addListener(() {
-      location = locationController.text;
-    });
-    workersController.addListener(() {
-      workers = int.tryParse(workersController.text) ?? 1;
-    });
-    hoursController.addListener(() {
-      hours = double.tryParse(hoursController.text) ?? 0.0;
-    });
-    mpifDController.addListener(() {
-      mpifD = double.tryParse(mpifDController.text) ?? 0.0;
-    });
-    mpifSController.addListener(() {
-      mpifS = double.tryParse(mpifSController.text) ?? 0.0;
-    });
-    mpifUController.addListener(() {
-      mpifU = double.tryParse(mpifUController.text) ?? 0.0;
-    });
-    mpifCCustomController.addListener(() {
-      if (mpifC == -1.0) {
-        mpifCCustom = double.tryParse(mpifCCustomController.text);
-      }
-    });
-    doseRateController.addListener(() {
-      doseRate = double.tryParse(doseRateController.text) ?? 0.0;
-    });
-  }
-
-  void disposeControllers() {
-    titleController.dispose();
-    titleFocusNode.dispose();
-    locationController.dispose();
-    workersController.dispose();
-    hoursController.dispose();
-    mpifDController.dispose();
-    mpifSController.dispose();
-    mpifUController.dispose();
-    mpifCCustomController.dispose();
-    doseRateController.dispose();
-    for (final n in nuclides) {
-      n.disposeControllers();
-    }
-    for (final e in extremities) {
-      e.disposeControllers();
-    }
-  }
-
-  Map<String, dynamic> toJson() => {
-    'title': title,
-    'location': location,
-    'workers': workers,
-    'hours': hours,
-    'mpifR': mpifR,
-    'mpifC': mpifC,
-    'mpifCCustom': mpifCCustom,
-    'mpifD': mpifD,
-    'mpifO': mpifO,
-    'mpifS': mpifS,
-    'mpifU': mpifU,
-    'doseRate': doseRate,
-    'pfr': pfr,
-    'pfe': pfe,
-    'nuclides': nuclides.map((n) => n.toJson()).toList(),
-    'extremities': extremities.map((e) => e.toJson()).toList(),
-    'sectionExpansionStates': sectionExpansionStates,
-    'sectionNotes': sectionNotes,
-  };
-
-  static TaskData fromJson(Map<String, dynamic> j) {
-    final rawNuclides = (j['nuclides'] as List?)
-        ?.map((e) => NuclideEntry.fromJson(e))
-        .toList();
-    final rawExtremities = (j['extremities'] as List?)
-        ?.map((e) => ExtremityEntry.fromJson(e))
-        .toList();
-    return TaskData(
-      title: j['title'] ?? '',
-      location: j['location'] ?? '',
-      workers: j['workers'] ?? 1,
-      hours: (j['hours'] ?? 1).toDouble(),
-      // Use 0.0 when values are missing so mPIF remains "not set" until user selects factors.
-      mpifR: j['mpifR'] != null ? (j['mpifR'] as num).toDouble() : null,
-      mpifC: (j['mpifC'] ?? 0).toDouble(),
-      mpifCCustom: j['mpifCCustom'] != null ? (j['mpifCCustom'] as num).toDouble() : null,
-      mpifD: (j['mpifD'] ?? 0).toDouble(),
-      mpifO: 1.0, // fixed — occupancy is always 1 for dose estimate tasks
-      mpifS: (j['mpifS'] ?? 0).toDouble(),
-      mpifU: (j['mpifU'] ?? 0).toDouble(),
-      doseRate: (j['doseRate'] ?? 0).toDouble(),
-      pfr: (j['pfr'] ?? 1).toDouble(),
-      pfe: (j['pfe'] ?? 1).toDouble(),
-      nuclides: (rawNuclides == null || rawNuclides.isEmpty)
-          ? null
-          : rawNuclides,
-      extremities: rawExtremities ?? const <ExtremityEntry>[],
-      sectionExpansionStates: j['sectionExpansionStates'] != null
-          ? Map<String, bool>.from(j['sectionExpansionStates'])
-          : null,
-      sectionNotes: j['sectionNotes'] != null
-          ? Map<String, String>.from(j['sectionNotes'])
-          : null,
-    );
-  }
-}
-
-class NuclideEntry {
-  String? name;
-  double contam; // dpm/100cm2
-  double? customDAC; // µCi/mL - only used when name is "Other"
-  final TextEditingController contamController = TextEditingController();
-  final TextEditingController dacController = TextEditingController();
-
-  NuclideEntry({this.name, this.contam = 0.0, this.customDAC}) {
-    contamController.text = contam.toString();
-    contamController.addListener(() {
-      final parsed = double.tryParse(contamController.text);
-      if (parsed != null) {
-        contam = parsed;
-      }
-    });
-
-    // Initialize DAC controller for "Other" nuclides
-    if (name == 'Other' && customDAC != null) {
-      dacController.text = customDAC!.toStringAsExponential(2);
-    }
-    dacController.addListener(() {
-      if (name == 'Other') {
-        final parsed = double.tryParse(dacController.text);
-        if (parsed != null && parsed > 0) {
-          customDAC = parsed;
-        }
-      }
-    });
-  }
-
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'contam': contam,
-    if (name == 'Other' && customDAC != null) 'customDAC': customDAC,
-  };
-
-  static NuclideEntry fromJson(Map<String, dynamic> j) => NuclideEntry(
-    name: j['name'],
-    contam: (j['contam'] ?? 0).toDouble(),
-    customDAC: j['customDAC']?.toDouble(),
-  );
-
-  void disposeControllers() {
-    contamController.dispose();
-    dacController.dispose();
-  }
-}
-
-class ExtremityEntry {
-  String? nuclide;
-  double doseRate;
-  double time;
-  double contam;
-  final TextEditingController doseRateController = TextEditingController();
-  final TextEditingController timeController = TextEditingController();
-  final TextEditingController contamController = TextEditingController();
-
-  ExtremityEntry({
-    this.nuclide,
-    this.doseRate = 0.0,
-    this.time = 0.0,
-    this.contam = 0.0,
-  }) {
-    // Initialize controllers with the current values
-    doseRateController.text = doseRate.toString();
-    timeController.text = time.toString();
-    contamController.text = contam.toString();
-
-    // Keep model fields in sync with controllers
-    doseRateController.addListener(() {
-      doseRate = double.tryParse(doseRateController.text) ?? 0.0;
-    });
-    timeController.addListener(() {
-      time = double.tryParse(timeController.text) ?? 0.0;
-    });
-    contamController.addListener(() {
-      contam = double.tryParse(contamController.text) ?? 0.0;
-    });
-  }
-
-  Map<String, dynamic> toJson() => {
-    'nuclide': nuclide,
-    'doseRate': doseRate,
-    'time': time,
-    'contam': contam,
-  };
-  static ExtremityEntry fromJson(Map<String, dynamic> j) => ExtremityEntry(
-    nuclide: j['nuclide'],
-    doseRate: (j['doseRate'] ?? 0).toDouble(),
-    time: (j['time'] ?? 0).toDouble(),
-    contam: (j['contam'] ?? 0).toDouble(),
-  );
-
-  void disposeControllers() {
-    doseRateController.dispose();
-    timeController.dispose();
-    contamController.dispose();
-  }
 }
 
 // Top-level Decoration that paints a rounded gradient 'frosted' indicator for tabs.
@@ -2076,96 +1842,6 @@ class _GradientPainter extends BoxPainter {
   }
 }
 
-/// Pill-style inner tab bar for Summary / Task tabs
-class _InnerTabBar extends StatelessWidget {
-  final TabController controller;
-  final List<String> labels;
-  const _InnerTabBar({required this.controller, required this.labels});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: List.generate(labels.length, (i) {
-            final selected = controller.index == i;
-            return Padding(
-              padding: const EdgeInsets.only(right: 6),
-              child: GestureDetector(
-                onTap: () => controller.animateTo(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? _kAccent
-                        : (isDark
-                              ? const Color(0xFF2C2C2E)
-                              : const Color(0xFFF2F2F7)),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    labels[i],
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                      color: selected
-                          ? Colors.white
-                          : (isDark
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade700),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
-
-class _AddTaskButton extends StatelessWidget {
-  final VoidCallback onPressed;
-  const _AddTaskButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: _kOk,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.add, size: 16, color: Colors.white),
-            SizedBox(width: 4),
-            Text(
-              'Add Task',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class DoseEstimateScreenState extends State<DoseEstimateScreen>
     with AutomaticKeepAliveClientMixin {
   @override
@@ -2199,6 +1875,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   TextEditingController workOrderController = TextEditingController();
   TextEditingController descriptionController = TextEditingController();
   TextEditingController dateController = TextEditingController();
+  TextEditingController preparerController = TextEditingController();
   // user overrides for trigger checkboxes
   Map<String, bool> triggerOverrides = {};
   // justifications for overrides
@@ -2227,6 +1904,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     workOrderController.dispose();
     descriptionController.dispose();
     dateController.dispose();
+    preparerController.dispose();
     for (final t in tasks) {
       t.disposeControllers();
     }
@@ -2297,112 +1975,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     );
   }
 
-  double computeMPIF(TaskData t) {
-    // Resolve C: -1.0 means custom, use mpifCCustom
-    final effectiveC = t.mpifC == -1.0 ? (t.mpifCCustom ?? 0.0) : t.mpifC;
-    // require all mPIF factors to be selected (non-zero) before computing
-    if (t.mpifR == null ||
-        effectiveC <= 0.0 ||
-        t.mpifD <= 0.0 ||
-        t.mpifS <= 0.0 ||
-        t.mpifU <= 0.0) {
-      return 0.0; // sentinel meaning 'not set'
-    }
-    // ensure all multipliers are treated as doubles and avoid integer-only arithmetic
-    final mPIF =
-        1e-6 *
-        (t.mpifR!) *
-        effectiveC *
-        (t.mpifD) *
-        (t.mpifO) *
-        (t.mpifS) *
-        (t.mpifU);
-    return mPIF;
-  }
+  // All dose math lives in lib/calc/dose_calculator.dart; these delegates
+  // keep the many existing call sites unchanged.
+  double computeMPIF(TaskData t) => calc.computeMPIF(t);
 
-  // Calculate task totals similar to the JS version
-  Map<String, double> calculateTaskTotals(TaskData t) {
-    final workers = t.workers;
-    final hours = t.hours;
-    final personHours = workers * hours;
-    final mPIF = computeMPIF(t);
-
-    // We'll compute a few different intermediate values for clarity and triggers:
-    // - dacFractionRaw: airConc / dac (before any protections)
-    // - dacFractionEngOnly: dacFractionRaw / PFE (after engineering controls only)
-    // - dacFractionWithResp: dacFractionRaw / (PFE * PFR) used for certain trigger calculations
-    double totalDacFraction = 0.0; // current UI field (post-PFE sum)
-    double totalDacFractionEngOnly = 0.0; // sum after engineering controls only
-    double totalDacFractionWithResp =
-        0.0; // sum after both eng + resp (used for some triggers)
-    double totalCollectiveInternal = 0.0;
-    double totalCollectiveInternalUnprotected = 0.0;
-    double totalCollectiveInternalAfterPFE = 0.0;
-
-    for (final n in t.nuclides) {
-      final res = computeNuclideDose(n, t);
-      final dacFractionEngOnly = res['dacFractionEngOnly'] ?? 0.0;
-      final dacFractionWithBoth = res['dacFractionWithBoth'] ?? 0.0;
-      final nuclideDoseAfterBoth = res['collective'] ?? 0.0;
-      final nuclideDoseUnprotected = res['unprotected'] ?? 0.0;
-      final nuclideDoseAfterPFE = res['afterPFE'] ?? 0.0;
-
-      totalDacFraction += dacFractionEngOnly;
-      totalDacFractionEngOnly += dacFractionEngOnly;
-      totalDacFractionWithResp += dacFractionWithBoth;
-
-      totalCollectiveInternal += nuclideDoseAfterBoth;
-      totalCollectiveInternalUnprotected += nuclideDoseUnprotected;
-      totalCollectiveInternalAfterPFE += nuclideDoseAfterPFE;
-    }
-
-    // Apply 15% respirator penalty if using a respirator (pfr > 1)
-    final respiratorPenalty = t.pfr > 1.0 ? 1.15 : 1.0;
-
-    final collectiveExternal = t.doseRate * personHours * respiratorPenalty;
-    final collectiveInternalWithPenalty =
-        totalCollectiveInternal * respiratorPenalty;
-    final collectiveEffective =
-        collectiveExternal + collectiveInternalWithPenalty;
-    final individualEffective = workers > 0
-        ? collectiveEffective / workers
-        : 0.0;
-
-    // Calculate extremity dose ONLY from manually entered extremity entries
-    // Each entry contributes: doseRate (mrem/hr) * time (hr) = total mrem per person
-    double totalExtremityDose = 0.0;
-    for (final e in t.extremities) {
-      // Only include entries with positive dose rate AND time
-      if (e.doseRate > 0.0 && e.time > 0.0) {
-        totalExtremityDose += e.doseRate * e.time;
-      }
-    }
-
-    // totalExtremityDose currently holds per-person extremity dose (sum of e.doseRate*e.time)
-    final individualExtremity = workers > 0 ? totalExtremityDose : 0.0;
-    final collectiveExtremity = totalExtremityDose * workers;
-
-    return {
-      'personHours': personHours,
-      'mPIF': mPIF,
-      'totalDacFraction':
-          totalDacFraction, // post-PFE (what the UI previously showed)
-      'totalDacFractionEngOnly': totalDacFractionEngOnly,
-      'totalDacFractionWithResp': totalDacFractionWithResp,
-      'collectiveInternal': collectiveInternalWithPenalty,
-      'collectiveInternalUnprotected': totalCollectiveInternalUnprotected,
-      'collectiveInternalAfterPFE': totalCollectiveInternalAfterPFE,
-      'collectiveExternal': collectiveExternal,
-      'collectiveEffective': collectiveEffective,
-      'individualEffective': individualEffective,
-      'respiratorPenalty': respiratorPenalty,
-      // keep backwards compatibility: 'totalExtremityDose' represents the collective extremity
-      // so that callers dividing by workers obtain the per-person dose as before.
-      'totalExtremityDose': collectiveExtremity,
-      'individualExtremity': individualExtremity,
-      'collectiveExtremity': collectiveExtremity,
-    };
-  }
+  Map<String, double> calculateTaskTotals(TaskData t) =>
+      calc.calculateTaskTotals(t);
 
   // Format numbers for display: use plain formatting for readable ranges,
   // exponential only when very small or very large.
@@ -2427,265 +2005,20 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     return '$sign$withCommas${decPart.isEmpty ? "" : ".$decPart"}';
   }
 
-  // Get DAC value for a nuclide, using custom DAC for "Other" nuclides
-  double getDAC(NuclideEntry n) {
-    if (n.name == 'Other' && n.customDAC != null && n.customDAC! > 0) {
-      return n.customDAC!;
-    }
-    return NuclideData.dacValues[n.name] ?? 1e-12;
-  }
+  // Get DAC value for a nuclide, using custom DAC for "Other" nuclides.
+  // Returns 0.0 when no nuclide is selected — callers must skip those rows
+  // rather than compute with a placeholder DAC.
+  double getDAC(NuclideEntry n) => calc.getDAC(n);
 
   // Get Appendix D base contamination level (dpm/100cm²) for removable contamination trigger
   // Returns the base level that gets multiplied by 1000 for the ALARA trigger
-  double getAppendixDBaseLevel(NuclideEntry n) {
-    final name = n.name?.toUpperCase();
-    if (name == null) return 100.0; // Default if no nuclide selected
+  double getAppendixDBaseLevel(NuclideEntry n) => calc.getAppendixDBaseLevel(n);
 
-    // U-nat, U-235, U-238, and associated decay products
-    if (name.contains('U-NAT') ||
-        name == 'U-235' ||
-        name == 'U-238' ||
-        name.startsWith('U-') &&
-            (name.contains('235') ||
-                name.contains('238') ||
-                name.contains('NAT'))) {
-      return 1000.0;
-    }
+  Map<String, double> computeNuclideDose(NuclideEntry n, TaskData t) =>
+      calc.computeNuclideDose(n, t);
 
-    // Transuranics: Ra-226, Ra-228, Th-230, Th-228, Pa-231, Ac-227, I-125, I-129
-    if (name == 'RA-226' ||
-        name == 'RA-228' ||
-        name == 'TH-230' ||
-        name == 'TH-228' ||
-        name == 'PA-231' ||
-        name == 'AC-227' ||
-        name == 'I-125' ||
-        name == 'I-129' ||
-        name.startsWith('PU-') ||
-        name.startsWith('AM-') ||
-        name.startsWith('CM-') ||
-        name.startsWith('NP-') ||
-        name.startsWith('BK-') ||
-        name.startsWith('CF-')) {
-      return 20.0;
-    }
-
-    // Th-nat, Th-232, Sr-90, Ra-223, Ra-224, U-232, I-126, I-131, I-133
-    if (name.contains('TH-NAT') ||
-        name == 'TH-232' ||
-        name == 'SR-90' ||
-        name == 'RA-223' ||
-        name == 'RA-224' ||
-        name == 'U-232' ||
-        name == 'I-126' ||
-        name == 'I-131' ||
-        name == 'I-133' ||
-        name.startsWith('TH-') &&
-            (name.contains('232') || name.contains('NAT'))) {
-      return 200.0;
-    }
-
-    // Tritium and STCs (Special Tritium Compounds)
-    if (name == 'H-3' || name == 'TRITIUM' || name.contains('TRITIUM')) {
-      return 10000.0;
-    }
-
-    // Beta-gamma emitters (default category for most nuclides)
-    // This includes all nuclides with decay modes other than alpha emission or spontaneous fission
-    // except Sr-90 and others noted above
-    return 1000.0;
-  }
-
-  // Compute per-nuclide dose components in one place to keep UI and totals consistent.
-  Map<String, double> computeNuclideDose(NuclideEntry n, TaskData t) {
-    final dac = getDAC(n);
-    final safeDac = (dac == 0.0) ? 1e-12 : dac;
-    final mPIF = computeMPIF(t);
-    final airConc = (n.contam / 100) * mPIF * (1 / 100) * (1 / 2.22e6);
-    final dacFractionRaw = (airConc / safeDac);
-    final dacFractionEngOnly = dacFractionRaw / (t.pfe == 0.0 ? 1.0 : t.pfe);
-    final dacFractionWithBoth =
-        dacFractionRaw /
-        ((t.pfe == 0.0 ? 1.0 : t.pfe) * (t.pfr == 0.0 ? 1.0 : t.pfr));
-
-    final workers = t.workers;
-    final personHours = workers * t.hours;
-
-    // Unprotected collective dose
-    final unprotected = dacFractionRaw * (personHours / 2000) * 5000;
-    final afterPFE = dacFractionEngOnly * (personHours / 2000) * 5000;
-    final collective =
-        dacFractionEngOnly *
-        (personHours / 2000) *
-        5000 /
-        (t.pfr == 0.0 ? 1.0 : t.pfr);
-
-    return {
-      'dac': dac,
-      'airConc': airConc,
-      'dacFractionRaw': dacFractionRaw,
-      'dacFractionEngOnly': dacFractionEngOnly,
-      'dacFractionWithBoth': dacFractionWithBoth,
-      'unprotected': unprotected,
-      'afterPFE': afterPFE,
-      'collective': collective,
-      'individual': workers > 0 ? collective / workers : 0.0,
-    };
-  }
-
-  /// Compute global ALARA and air-sampling triggers across all tasks.
-  Map<String, dynamic> computeGlobalTriggers() {
-    double totalIndividualEffectiveDose = 0.0;
-    double totalIndividualExtremityDose = 0.0;
-    double totalCollectiveDose = 0.0;
-
-    double maxDacHrsWithResp = 0.0;
-    double maxDacSpikeEngOnly = 0.0;
-    double maxDacHrsEngOnly = 0.0;
-    double maxContamination = 0.0;
-    double maxDoseRate = 0.0;
-
-    for (final t in tasks) {
-      final totals = calculateTaskTotals(t);
-      final workers = t.workers;
-      final individualExternal = workers > 0
-          ? (totals['collectiveExternal']! / workers)
-          : 0.0;
-      final individualInternal = workers > 0
-          ? (totals['collectiveInternal']! / workers)
-          : 0.0;
-      totalIndividualEffectiveDose += individualExternal + individualInternal;
-      totalIndividualExtremityDose += totals['individualExtremity']!;
-      totalCollectiveDose += totals['collectiveEffective']!;
-
-      maxDoseRate = maxDoseRate > t.doseRate ? maxDoseRate : t.doseRate;
-
-      double taskDacWithResp = 0.0;
-      double taskDacEngOnly = 0.0;
-
-      for (final n in t.nuclides) {
-        final contam = n.contam;
-        final dac = getDAC(n);
-        final mPIF = computeMPIF(t);
-        final airConc = (contam / 100) * mPIF * (1 / 100) * (1 / 2.22e6);
-        // Guard against divide-by-zero even if invalid values slip in via import.
-        final safeDac = (dac == 0.0) ? 1e-12 : dac;
-        final safePfe = (t.pfe <= 0.0) ? 1.0 : t.pfe;
-        final safePfr = (t.pfr <= 0.0) ? 1.0 : t.pfr;
-        final dacFractionWithBoth = (airConc / safeDac) / (safePfe * safePfr);
-        final dacFractionEngOnly = (airConc / safeDac) / safePfe;
-
-        taskDacWithResp += dacFractionWithBoth;
-        taskDacEngOnly += dacFractionEngOnly;
-
-        // Calculate contamination ratio using radionuclide-specific Appendix D base level
-        final appendixDBase = getAppendixDBaseLevel(n);
-        final contamRatio = contam / (appendixDBase * 1000);
-        maxContamination = maxContamination > contamRatio
-            ? maxContamination
-            : contamRatio;
-        maxDacSpikeEngOnly = maxDacSpikeEngOnly > taskDacEngOnly
-            ? maxDacSpikeEngOnly
-            : taskDacEngOnly;
-      }
-
-      final dacHrsWithResp = taskDacWithResp * t.hours;
-      maxDacHrsWithResp = maxDacHrsWithResp > dacHrsWithResp
-          ? maxDacHrsWithResp
-          : dacHrsWithResp;
-
-      final dacHrsEngOnly = taskDacEngOnly * t.hours;
-      maxDacHrsEngOnly = maxDacHrsEngOnly > dacHrsEngOnly
-          ? maxDacHrsEngOnly
-          : dacHrsEngOnly;
-    }
-
-    // derive individual trigger booleans similar to the original HTML logic
-    final alara2 = totalIndividualEffectiveDose > 500;
-    final alara3 = totalIndividualExtremityDose > 5000;
-    final alara4 = totalCollectiveDose > 750;
-    final alara5 = maxDacHrsEngOnly > 200 || maxDacSpikeEngOnly > 1000;
-    final alara6 = maxContamination > 1;
-    final alara8 = maxDoseRate > 10000;
-
-    // calculate internal-only totals for alara7
-    double totalInternalDoseOnly = 0.0;
-    for (final t in tasks) {
-      final totals = calculateTaskTotals(t);
-      final workers = t.workers;
-      final individualInternal = workers > 0
-          ? (totals['collectiveInternal']! / workers)
-          : 0.0;
-      totalInternalDoseOnly += individualInternal;
-    }
-    final alara7 = totalInternalDoseOnly > 100;
-
-    // Do not auto-check 'Non-routine or complex work' — user should decide this.
-    final alara1 = false;
-
-    final sampling1 = maxDacHrsWithResp > 40;
-    final sampling2 = tasks.any((t) => t.pfr > 1);
-    final sampling3 = false; // subjective, left for user to check
-    final sampling4 = tasks.any((t) {
-      final totals = calculateTaskTotals(t);
-      final workers = t.workers;
-      final individualInternal = workers > 0
-          ? (totals['collectiveInternal']! / workers)
-          : 0.0;
-      return individualInternal > 500;
-    });
-    final condition1 = (maxDacHrsEngOnly / 40) > 0.3;
-    final condition2 = maxDacSpikeEngOnly > 1.0;
-    final sampling5 = condition1 || condition2;
-    final sampling7 = sampling5;
-    final sampling6 =
-        false; // subjective job-based triggers left unchecked automatically
-
-    final camsRequired = maxDacHrsWithResp > 40;
-
-    // Aggregate some higher-level flags used by the UI
-    final alaraReview =
-        alara1 ||
-        alara2 ||
-        alara3 ||
-        alara4 ||
-        alara5 ||
-        alara6 ||
-        alara7 ||
-        alara8;
-    final airSampling =
-        sampling1 ||
-        sampling2 ||
-        sampling3 ||
-        sampling4 ||
-        sampling5 ||
-        sampling6 ||
-        sampling7;
-
-    return {
-      'alara1': alara1,
-      'alara2': alara2,
-      'alara3': alara3,
-      'alara4': alara4,
-      'alara5': alara5,
-      'alara6': alara6,
-      'alara7': alara7,
-      'alara8': alara8,
-      'sampling1': sampling1,
-      'sampling2': sampling2,
-      'sampling3': sampling3,
-      'sampling4': sampling4,
-      'sampling5': sampling5,
-      'sampling6': sampling6,
-      'sampling7': sampling7,
-      'camsRequired': camsRequired,
-      'alaraReview': alaraReview,
-      'airSampling': airSampling,
-      'totalIndividualEffectiveDose': totalIndividualEffectiveDose,
-      'totalIndividualExtremityDose': totalIndividualExtremityDose,
-      'totalCollectiveDose': totalCollectiveDose,
-    };
-  }
+  Map<String, dynamic> computeGlobalTriggers() =>
+      calc.computeGlobalTriggers(tasks);
 
   // Get final trigger states considering both computed triggers and manual overrides
   Map<String, bool> getFinalTriggerStates() {
@@ -2840,72 +2173,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   String _tempJustification = '';
 
   // Return short textual reasons for why each trigger was set (task numbers and brief reason)
-  Map<String, String> computeTriggerReasons() {
-    final reasons = <String, String>{};
-    if (tasks.isEmpty) return reasons;
-
-    // Check for sampling1/cams (DAC-hrs > 40 with resp protection taken into account)
-    for (var i = 0; i < tasks.length; i++) {
-      final t = tasks[i];
-      final totals = calculateTaskTotals(t);
-      final workers = t.workers;
-      // compute per-nuclide DAC fraction with both protections
-      double taskDacWithResp = 0.0;
-      double taskDacEngOnly = 0.0;
-      for (final n in t.nuclides) {
-        final contam = n.contam;
-        final dac = getDAC(n);
-        final mPIF = computeMPIF(t);
-        final airConc = (contam / 100) * mPIF * (1 / 100) * (1 / 2.22e6);
-        final safeDac = (dac == 0.0) ? 1e-12 : dac;
-        final safePfe = (t.pfe <= 0.0) ? 1.0 : t.pfe;
-        final safePfr = (t.pfr <= 0.0) ? 1.0 : t.pfr;
-        final dacWithBoth = (airConc / safeDac) / (safePfe * safePfr);
-        final dacEngOnly = (airConc / safeDac) / safePfe;
-        taskDacWithResp += dacWithBoth;
-        taskDacEngOnly += dacEngOnly;
-      }
-      final dacHrsWithResp = taskDacWithResp * t.hours;
-      final dacHrsEngOnly = taskDacEngOnly * t.hours;
-
-      if (dacHrsWithResp > 40) {
-        reasons['sampling1'] =
-            'Task ${i + 1} (> ${dacHrsWithResp.toStringAsFixed(2)} DAC-hrs)';
-        reasons['camsRequired'] =
-            'Task ${i + 1} (> ${dacHrsWithResp.toStringAsFixed(2)} DAC-hrs)';
-      }
-      if (dacHrsEngOnly / 40 > 0.3) {
-        reasons['sampling5'] =
-            'Task ${i + 1} (avg ${(dacHrsEngOnly / 40).toStringAsFixed(2)} DAC)';
-      }
-      if (taskDacEngOnly > 1.0) {
-        reasons['sampling5'] =
-            (reasons['sampling5'] ?? '') + ' spike by Task ${i + 1}';
-      }
-
-      // alara triggers
-      if ((totals['individualEffective'] ?? 0) > 500)
-        reasons['alara2'] = 'Task ${i + 1} individual effective > 500 mrem';
-      if (t.workers > 0 &&
-          (totals['totalExtremityDose'] ?? 0) / t.workers > 5000)
-        reasons['alara3'] = 'Task ${i + 1} extremity > 5000 mrem';
-      if ((totals['collectiveEffective'] ?? 0) > 750)
-        reasons['alara4'] = 'Task ${i + 1} collective > 750 mrem';
-      if (taskDacEngOnly * t.hours > 200)
-        reasons['alara5'] = 'Task ${i + 1} DAC-hrs eng-only > 200';
-      if (t.nuclides.any(
-        (n) => n.contam / (getAppendixDBaseLevel(n) * 1000) > 1,
-      ))
-        reasons['alara6'] = 'Task ${i + 1} contamination > 1000x Appendix D';
-      if (t.workers > 0 &&
-          (totals['collectiveInternal'] ?? 0) / t.workers > 100)
-        reasons['alara7'] = 'Task ${i + 1} internal > 100 mrem';
-      if (t.doseRate > 10000)
-        reasons['alara8'] = 'Task ${i + 1} dose rate > 10 rem/hr';
-    }
-
-    return reasons;
-  }
+  Map<String, String> computeTriggerReasons() =>
+      calc.computeTriggerReasons(tasks);
 
   static final Set<double> _allowedPfrValues = {1.0, 50.0, 1000.0};
   static final Set<double> _allowedPfeValues = {1.0, 1000.0, 100000.0};
@@ -2959,6 +2228,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     if (t.mpifC != -1.0 && !_isAllowedDouble(t.mpifC, _allowedMpifCValues)) {
       return 'mPIF Confinement Factor (C) must be one of ${_allowedMpifCValues.toList()..sort()} (got ${t.mpifC}).';
     }
+    if (t.mpifC == -1.0 &&
+        t.mpifCCustom != null &&
+        (!t.mpifCCustom!.isFinite || t.mpifCCustom! <= 0)) {
+      return 'Custom mPIF Confinement Factor (C) must be > 0 (got ${t.mpifCCustom}).';
+    }
     if (!_isAllowedDouble(t.mpifD, _allowedMpifDValues)) {
       return 'mPIF Dispersibility (D) must be one of ${_allowedMpifDValues.toList()..sort()} (got ${t.mpifD}).';
     }
@@ -2981,13 +2255,21 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     }
 
     for (final e in t.extremities) {
-      if (e.doseRate < 0)
+      if (e.doseRate < 0) {
         return 'Extremity dose rate must be ≥ 0 (got ${e.doseRate}).';
+      }
       if (e.time < 0) return 'Extremity time must be ≥ 0 (got ${e.time}).';
-      if (e.contam < 0)
+      if (e.contam < 0) {
         return 'Extremity contamination must be ≥ 0 (got ${e.contam}).';
+      }
+      // Accept anything the extremity autocomplete offers ('Other', 'Various',
+      // any DAC-table nuclide) plus the legacy extremityNuclides list so older
+      // files still load.
       if (e.nuclide != null &&
           e.nuclide!.isNotEmpty &&
+          e.nuclide != 'Other' &&
+          e.nuclide != 'Various' &&
+          !NuclideData.dacValues.containsKey(e.nuclide) &&
           !NuclideData.extremityNuclides.contains(e.nuclide)) {
         return 'Extremity nuclide "${e.nuclide}" is not a supported selection.';
       }
@@ -3001,27 +2283,37 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
 
     if (kIsWeb) {
       // For web, trigger file download
-      final state = {
-        'projectInfo': {
-          'workOrder': workOrderController.text,
-          'date': dateController.text,
-          'description': descriptionController.text,
-        },
-        'tasks': tasks.map((t) => t.toJson()).toList(),
-        'ui': {'activeIdx': _activeIdx},
-        'triggerOverrides': triggerOverrides,
-        'overrideJustifications': overrideJustifications,
-        if (containmentState != null) 'containment': containmentState,
-      };
-      final jsonStr = jsonEncode(state);
-      await file_download.downloadJson(
-        jsonStr,
-        'dose_assessment_${DateTime.now().millisecondsSinceEpoch}.json',
-      );
-      if (mounted)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('File downloaded successfully.')),
+      try {
+        final state = {
+          'projectInfo': {
+            'workOrder': workOrderController.text,
+            'date': dateController.text,
+            'description': descriptionController.text,
+            'preparer': preparerController.text,
+          },
+          'tasks': tasks.map((t) => t.toJson()).toList(),
+          'ui': {'activeIdx': _activeIdx},
+          'triggerOverrides': triggerOverrides,
+          'overrideJustifications': overrideJustifications,
+          if (containmentState != null) 'containment': containmentState,
+        };
+        final jsonStr = jsonEncode(state);
+        await file_download.downloadJson(
+          jsonStr,
+          'dose_assessment_${DateTime.now().millisecondsSinceEpoch}.json',
         );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('File downloaded successfully.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Failed to save file: $e')));
+        }
+      }
       return;
     }
 
@@ -3031,6 +2323,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
           'workOrder': workOrderController.text,
           'date': dateController.text,
           'description': descriptionController.text,
+          'preparer': preparerController.text,
         },
         'tasks': tasks.map((t) => t.toJson()).toList(),
         'ui': {'activeIdx': _activeIdx},
@@ -3050,16 +2343,18 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       if (outputFile != null) {
         final file = File(outputFile);
         await file.writeAsString(jsonStr);
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('File saved successfully')),
           );
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to save file: $e')));
+      }
     }
   }
 
@@ -3085,16 +2380,18 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         final Map<String, dynamic> state = jsonDecode(fileContent);
         final applied = _applyImportedState(state, showErrors: true);
         if (!applied) return;
-        if (mounted)
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('File loaded successfully')),
           );
+        }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Failed to load file: $e')));
+      }
     }
   }
 
@@ -3108,6 +2405,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     for (var i = 0; i < parsedTasks.length; i++) {
       final err = _validateTaskForImport(parsedTasks[i]);
       if (err != null) {
+        // Dispose the controllers of every task we constructed before
+        // rejecting the import, or they all leak.
+        for (final tt in parsedTasks) {
+          tt.disposeControllers();
+        }
         if (showErrors && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Import rejected (Task ${i + 1}): $err')),
@@ -3121,6 +2423,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       workOrderController.text = state['projectInfo']?['workOrder'] ?? '';
       dateController.text = state['projectInfo']?['date'] ?? '';
       descriptionController.text = state['projectInfo']?['description'] ?? '';
+      preparerController.text = state['projectInfo']?['preparer'] ?? '';
       for (final tt in tasks) {
         tt.disposeControllers();
       }
@@ -3152,12 +2455,35 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     return true;
   }
 
+  /// Opens a calendar picker for the project date and writes the chosen day
+  /// back as an ISO (YYYY-MM-DD) string.
+  Future<void> _pickDate() async {
+    DateTime initial = DateTime.now();
+    final existing = DateTime.tryParse(dateController.text.trim());
+    if (existing != null) initial = existing;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      final iso =
+          '${picked.year.toString().padLeft(4, '0')}-'
+          '${picked.month.toString().padLeft(2, '0')}-'
+          '${picked.day.toString().padLeft(2, '0')}';
+      setState(() => dateController.text = iso);
+    }
+  }
+
   Future<void> newEstimate() async {
     final hasContent =
         tasks.isNotEmpty ||
         workOrderController.text.isNotEmpty ||
         dateController.text.isNotEmpty ||
-        descriptionController.text.isNotEmpty;
+        descriptionController.text.isNotEmpty ||
+        preparerController.text.isNotEmpty;
 
     if (hasContent) {
       final action = await showDialog<String>(
@@ -3200,6 +2526,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       workOrderController.clear();
       dateController.clear();
       descriptionController.clear();
+      preparerController.clear();
       triggerOverrides = {};
       overrideJustifications = {};
     });
@@ -3231,36 +2558,6 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
   static final PdfColor _pdfNavyMid = PdfColor.fromHex('#99BBCC');
 
   // ─── PDF helper widgets ────────────────────────────────────────────────────
-
-  /// Key-value row used in detail boxes.
-  pw.Widget _pdfKV(String label, String value, {bool bold = false}) =>
-      pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(vertical: 2),
-        child: pw.Row(
-          children: [
-            pw.SizedBox(
-              width: 130,
-              child: pw.Text(
-                label,
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  color: _pdfInk3,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-            ),
-            pw.Expanded(
-              child: pw.Text(
-                value,
-                style: pw.TextStyle(
-                  fontSize: 9,
-                  fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
 
   /// Header cell for PDF tables.
   pw.Widget _pdfTH(String text, {pw.TextAlign align = pw.TextAlign.left}) =>
@@ -3306,29 +2603,6 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         color: _pdfInk4,
       ),
     ),
-  );
-
-  /// Section heading with underline — task detail pages.
-  pw.Widget _pdfSection(String title) => pw.Column(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.SizedBox(height: 12),
-      pw.Container(
-        padding: const pw.EdgeInsets.only(bottom: 3),
-        decoration: pw.BoxDecoration(
-          border: pw.Border(bottom: pw.BorderSide(color: _pdfHair, width: 0.8)),
-        ),
-        child: pw.Text(
-          title,
-          style: pw.TextStyle(
-            fontSize: 10,
-            fontWeight: pw.FontWeight.bold,
-            color: _pdfInk1,
-          ),
-        ),
-      ),
-      pw.SizedBox(height: 6),
-    ],
   );
 
   /// Horizontal progress bar (0–100%). Uses pw.Table to avoid Row/Expanded issues.
@@ -3388,7 +2662,17 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
           (computedTriggers['maxDacHrsWithResp'] as double?) ?? 0.0;
       final maxDacHrsEngOnly =
           (computedTriggers['maxDacHrsEngOnly'] as double?) ?? 0.0;
+      final maxDacSpikeEngOnly =
+          (computedTriggers['maxDacSpikeEngOnly'] as double?) ?? 0.0;
+      final maxContamination =
+          (computedTriggers['maxContamination'] as double?) ?? 0.0;
+      final maxDoseRate = (computedTriggers['maxDoseRate'] as double?) ?? 0.0;
+      final totalInternalDoseOnly =
+          (computedTriggers['totalInternalDoseOnly'] as double?) ?? 0.0;
 
+      // Individual effective dose summed across all tasks — the same basis
+      // computeGlobalTriggers uses for the alara2 (500 mrem) trigger, so the
+      // gauge, criteria table, and on-screen trigger pill always agree.
       double maxIndEff = 0.0;
       double totalCollExt = 0.0;
       double totalCollInt = 0.0;
@@ -3409,7 +2693,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
 
         totalCollExt += cExt;
         totalCollInt += cInt;
-        if (iTotal > maxIndEff) maxIndEff = iTotal;
+        maxIndEff += iTotal;
         totalWorkers += w;
         totalPersonHrs += w * t.hours;
 
@@ -3441,6 +2725,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
           ? dateController.text
           : '-';
       final descStr = descriptionController.text;
+      final preparerStr = preparerController.text.trim();
       final nTasks = tasks.length;
 
       // ════════════════════════════════════════════════════════════════════
@@ -3663,16 +2948,14 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
               );
             }
 
-            final maxIExt = taskSummaries.isEmpty
-                ? 0.0
-                : taskSummaries
-                      .map((s) => s['iExt'] as double)
-                      .reduce((a, b) => a > b ? a : b);
-            final maxIInt = taskSummaries.isEmpty
-                ? 0.0
-                : taskSummaries
-                      .map((s) => s['iInt'] as double)
-                      .reduce((a, b) => a > b ? a : b);
+            final maxIExt = taskSummaries.fold<double>(
+              0.0,
+              (s, ts) => s + (ts['iExt'] as double),
+            );
+            final maxIInt = taskSummaries.fold<double>(
+              0.0,
+              (s, ts) => s + (ts['iInt'] as double),
+            );
 
             final doseCards = pw.Table(
               columnWidths: const {
@@ -3684,7 +2967,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 pw.TableRow(
                   children: [
                     doseCard(
-                      heading: 'Maximum Individual Effective Dose',
+                      heading: 'Individual Total Effective Dose (all tasks)',
                       mainVal: maxIndEff.toStringAsFixed(2),
                       unit: 'mrem',
                       pctLabel: '${indPct.round()}% of limit',
@@ -3750,13 +3033,13 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
             );
 
             // Extremity dosimetry required when individual extremity dose ≥ 5,000 mrem
+            // (summed across tasks — same basis as the alara3 trigger)
             final maxIndExtrm = taskSummaries.fold<double>(
               0,
-              (s, ts) => (ts['iExtrm'] as double) > s ? (ts['iExtrm'] as double) : s,
+              (s, ts) => s + (ts['iExtrm'] as double),
             );
             final dosimetryTriggered = maxIndExtrm >= 5000;
-            final anyTriggeredWithDos =
-                anyTriggered || dosimetryTriggered;
+            final anyTriggeredWithDos = anyTriggered || dosimetryTriggered;
 
             final pillRow = pw.Row(
               children: [
@@ -3858,7 +3141,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
 
               if (alaraTriggered) {
                 rows.add(groupRow('ALARA Review'));
-                if (maxIndEff > 500)
+                if (maxIndEff > 500) {
                   rows.add(
                     dataRow(
                       'Individual total effective dose',
@@ -3866,7 +3149,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       '${maxIndEff.toStringAsFixed(2)} mrem',
                     ),
                   );
-                if (maxDacHrsEngOnly > 200)
+                }
+                if (maxDacHrsEngOnly > 200) {
                   rows.add(
                     dataRow(
                       'Airborne DAC-hours (engineering controls)',
@@ -3874,7 +3158,17 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       '${maxDacHrsEngOnly.toStringAsFixed(2)} DAC-hrs',
                     ),
                   );
-                if (totalColl > 750)
+                }
+                if (maxDacSpikeEngOnly > 1000) {
+                  rows.add(
+                    dataRow(
+                      'Airborne concentration spike (eng. controls)',
+                      '1,000 DAC',
+                      '${maxDacSpikeEngOnly.toStringAsFixed(2)} DAC',
+                    ),
+                  );
+                }
+                if (totalColl > 750) {
                   rows.add(
                     dataRow(
                       'Collective effective dose',
@@ -3882,10 +3176,47 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       '${totalColl.toStringAsFixed(2)} person-mrem',
                     ),
                   );
+                }
+                if (maxIndExtrm > 5000) {
+                  rows.add(
+                    dataRow(
+                      'Individual extremity dose',
+                      '5,000 mrem',
+                      '${maxIndExtrm.toStringAsFixed(2)} mrem',
+                    ),
+                  );
+                }
+                if (maxContamination > 1) {
+                  rows.add(
+                    dataRow(
+                      'Removable contamination (× 1,000 Appendix D level)',
+                      '1×',
+                      '${maxContamination.toStringAsFixed(2)}×',
+                    ),
+                  );
+                }
+                if (totalInternalDoseOnly > 100) {
+                  rows.add(
+                    dataRow(
+                      'Individual internal dose',
+                      '100 mrem',
+                      '${totalInternalDoseOnly.toStringAsFixed(2)} mrem',
+                    ),
+                  );
+                }
+                if (maxDoseRate > 10000) {
+                  rows.add(
+                    dataRow(
+                      'Dose rate at 30 cm',
+                      '10,000 mrem/hr',
+                      '${maxDoseRate.toStringAsFixed(2)} mrem/hr',
+                    ),
+                  );
+                }
               }
               if (airTriggered) {
                 rows.add(groupRow('Air Sampling Required'));
-                if (maxDacHrsWithResp > 40)
+                if (maxDacHrsWithResp > 40) {
                   rows.add(
                     dataRow(
                       'Worker DAC-hours (with resp. protection)',
@@ -3893,10 +3224,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       '${maxDacHrsWithResp.toStringAsFixed(2)} DAC-hrs',
                     ),
                   );
-                if (tasks.any((t) => t.pfr > 1))
+                }
+                if (tasks.any((t) => t.pfr > 1)) {
                   rows.add(
                     dataRow('Respiratory protection prescribed', 'Any', 'Yes'),
                   );
+                }
               }
               if (camsTriggered) {
                 rows.add(groupRow('Continuous Air Monitors (CAMs) Required'));
@@ -4071,9 +3404,27 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   ),
                   pw.TableRow(
                     children: [
-                      pw.SizedBox(height: 22),
+                      // Pre-fill the preparer's typed name above the signature
+                      // line (they still sign by hand).
+                      pw.Container(
+                        height: 22,
+                        alignment: pw.Alignment.bottomLeft,
+                        padding: const pw.EdgeInsets.only(bottom: 2),
+                        child: pw.Text(
+                          preparerStr,
+                          style: pw.TextStyle(fontSize: 10, color: _pdfInk1),
+                        ),
+                      ),
                       pw.SizedBox(),
-                      pw.SizedBox(),
+                      pw.Container(
+                        height: 22,
+                        alignment: pw.Alignment.bottomLeft,
+                        padding: const pw.EdgeInsets.only(bottom: 2),
+                        child: pw.Text(
+                          dateStr == '-' ? '' : dateStr,
+                          style: pw.TextStyle(fontSize: 10, color: _pdfInk1),
+                        ),
+                      ),
                       pw.SizedBox(),
                       pw.SizedBox(),
                       pw.SizedBox(),
@@ -4121,7 +3472,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           pillRow,
                           if (triggerDetail != null) ...[
                             pw.SizedBox(height: 6),
-                            triggerDetail!,
+                            triggerDetail,
                           ],
                           if (overrideJustifications.isNotEmpty) ...[
                             pw.SizedBox(height: 8),
@@ -4210,7 +3561,6 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         final iExt = summary['iExt'] as double;
         final iInt = summary['iInt'] as double;
         final iExtrm = summary['iExtrm'] as double;
-        final iTotal = summary['iTotal'] as double;
 
         pdf.addPage(
           pw.Page(
@@ -4924,7 +4274,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       // ════════════════════════════════════════════════════════════════════
       // NOTES PAGE — only added when at least one section has notes
       // ════════════════════════════════════════════════════════════════════
-      const _sectionNames = {
+      const sectionNames = {
         'timeEstimation': 'Time Estimation',
         'mpifCalculation': 'mPIF Calculation',
         'externalDose': 'External Dose Estimate',
@@ -4940,8 +4290,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         for (final entry in t.sectionNotes.entries) {
           if (entry.value.trim().isEmpty) continue;
           noteEntries.add({
-            'task': 'Task ${ti + 1}${t.title.isNotEmpty ? " — ${t.title}" : ""}',
-            'section': _sectionNames[entry.key] ?? entry.key,
+            'task':
+                'Task ${ti + 1}${t.title.isNotEmpty ? " — ${t.title}" : ""}',
+            'section': sectionNames[entry.key] ?? entry.key,
             'note': entry.value.trim(),
           });
         }
@@ -4981,12 +4332,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
             ),
             build: (pw.Context ctx) => [
               pw.Padding(
-                padding: const pw.EdgeInsets.fromLTRB(
-                  _pdfM,
-                  16,
-                  _pdfM,
-                  _pdfM,
-                ),
+                padding: const pw.EdgeInsets.fromLTRB(_pdfM, 16, _pdfM, _pdfM),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -4997,10 +4343,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         padding: const pw.EdgeInsets.all(10),
                         decoration: pw.BoxDecoration(
                           color: _pdfSurf2,
-                          border: pw.Border.all(
-                            color: _pdfHair,
-                            width: 0.5,
-                          ),
+                          border: pw.Border.all(color: _pdfHair, width: 0.5),
                           borderRadius: const pw.BorderRadius.all(
                             pw.Radius.circular(5),
                           ),
@@ -5055,15 +4398,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         );
       }
 
-      // Print
-      await Printing.layoutPdf(
+      // Print — layoutPdf returns false when the user cancels the dialog.
+      final printed = await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async => pdf.save(),
       );
 
-      if (mounted) {
+      if (printed && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Print dialog opened')));
+        ).showSnackBar(const SnackBar(content: Text('Report sent to printer')));
       }
     } catch (e) {
       if (mounted) {
@@ -5087,7 +4430,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
               Icon(
                 Icons.playlist_add_check_rounded,
                 size: 56,
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 16),
               Text(
@@ -5100,12 +4445,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
               ),
               const SizedBox(height: 6),
               Text(
-                'Use "Add Task" above to begin.',
+                'Use "+ Add task" in the left panel to begin.',
                 style: TextStyle(
                   fontSize: 14,
                   color: Theme.of(
                     context,
-                  ).colorScheme.onSurface.withOpacity(0.5),
+                  ).colorScheme.onSurface.withValues(alpha: 0.5),
                 ),
               ),
             ],
@@ -5114,25 +4459,22 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       );
     }
 
+    // Compute each task's totals once per frame — buildSummary previously
+    // recomputed them in three separate folds.
     double totalCollectiveExternal = 0.0;
     double totalCollectiveInternal = 0.0;
-
     double totalIndividual = 0.0;
+    double totalIndivExtremity = 0.0;
+    double totalCollExtremity = 0.0;
     for (final t in tasks) {
       final totals = calculateTaskTotals(t);
       totalCollectiveExternal += totals['collectiveExternal']!;
       totalCollectiveInternal += totals['collectiveInternal']!;
       totalIndividual += totals['individualEffective']!;
+      totalIndivExtremity += totals['individualExtremity']!;
+      totalCollExtremity += totals['collectiveExtremity']!;
     }
     final totalCollective = totalCollectiveExternal + totalCollectiveInternal;
-    final totalIndivExtremity = tasks.fold<double>(
-      0,
-      (s, t) => s + calculateTaskTotals(t)['individualExtremity']!,
-    );
-    final totalCollExtremity = tasks.fold<double>(
-      0,
-      (s, t) => s + calculateTaskTotals(t)['collectiveExtremity']!,
-    );
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? _kDarkSurface : _kSurface;
@@ -5155,12 +4497,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     // Extremity dosimetry required when individual extremity dose ≥ 5,000 mrem
     final dosimetryRequired = totalIndivExtremity >= 5000;
 
-    Color _summaryColor(String st) => st == 'danger'
+    Color summaryColor(String st) => st == 'danger'
         ? _kDanger
         : st == 'warn'
         ? _kWarn
         : _kOk;
-    Color _summaryWash(String st) => st == 'danger'
+    Color summaryWash(String st) => st == 'danger'
         ? _kDangerWash
         : st == 'warn'
         ? _kWarnWash
@@ -5174,8 +4516,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       String subLabel,
       double pct,
     ) {
-      final col = _summaryColor(status);
-      final wash = isDark ? col.withValues(alpha: 0.12) : _summaryWash(status);
+      final col = summaryColor(status);
+      final wash = isDark ? col.withValues(alpha: 0.12) : summaryWash(status);
       return Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
@@ -5296,29 +4638,33 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         ),
                       ],
                     ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        _StatusBadge(
-                          label: 'ALARA Review',
-                          triggered: finalTriggers['alaraReview'] == true,
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusBadge(
-                          label: 'Air Sampling',
-                          triggered: finalTriggers['airSampling'] == true,
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusBadge(
-                          label: 'CAMs',
-                          triggered: finalTriggers['camsRequired'] == true,
-                        ),
-                        const SizedBox(width: 8),
-                        _StatusBadge(
-                          label: 'Extremity Dosimetry',
-                          triggered: dosimetryRequired,
-                        ),
-                      ],
+                    const SizedBox(width: 16),
+                    // Wrap so the badges flow to a second line on narrow
+                    // windows instead of overflowing the header row.
+                    Expanded(
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _StatusBadge(
+                            label: 'ALARA Review',
+                            triggered: finalTriggers['alaraReview'] == true,
+                          ),
+                          _StatusBadge(
+                            label: 'Air Sampling',
+                            triggered: finalTriggers['airSampling'] == true,
+                          ),
+                          _StatusBadge(
+                            label: 'CAMs',
+                            triggered: finalTriggers['camsRequired'] == true,
+                          ),
+                          _StatusBadge(
+                            label: 'Extremity Dosimetry',
+                            triggered: dosimetryRequired,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -5329,7 +4675,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   children: [
                     Expanded(
                       child: summaryBig(
-                        'Max individual effective dose',
+                        'Individual effective dose (all tasks)',
                         formatNumber(totalIndividual),
                         'mrem',
                         indivStatus,
@@ -5534,7 +4880,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 SizedBox(
                                   width: 32,
                                   child: Text(
-                                    '${(i + 1).toString().padLeft(2, '0')}',
+                                    (i + 1).toString().padLeft(2, '0'),
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: ink4,
@@ -5881,8 +5227,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     final bg = isDark ? _kDarkBg : _kBg;
 
     // Clamp active index if tasks were deleted
-    if (_activeIdx >= tasks.length)
+    if (_activeIdx >= tasks.length) {
       _activeIdx = tasks.isEmpty ? -1 : tasks.length - 1;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -5895,55 +5242,51 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
             border: Border(bottom: BorderSide(color: hairline)),
           ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _WorkField(
-                label: 'WCD (Work Control Document)',
-                controller: workOrderController,
-                onChanged: () => setState(() {}),
-              ),
-              _WorkDivider(color: hairline),
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: _WorkFieldRaw(
-                    label: 'Description',
-                    controller: descriptionController,
-                    onChanged: () => setState(() {}),
-                  ),
+              SizedBox(
+                width: 176,
+                child: _WorkField(
+                  label: 'WCD',
+                  controller: workOrderController,
+                  onChanged: () => setState(() {}),
+                  hint: 'WCD number',
+                  required: true,
                 ),
               ),
-              _WorkDivider(color: hairline),
-              _WorkField(
-                label: 'Date',
-                controller: dateController,
-                onChanged: () => setState(() {}),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 2,
+                child: _WorkField(
+                  label: 'Description',
+                  controller: descriptionController,
+                  onChanged: () => setState(() {}),
+                  hint: 'Brief scope of work',
+                  required: true,
+                ),
               ),
-              _WorkDivider(color: hairline),
-              Padding(
-                padding: const EdgeInsets.only(left: 18),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'PREPARER',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: ink4,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.08,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      workOrderController.text.isEmpty ? '—' : 'See WCD',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        color: ink1,
-                      ),
-                    ),
-                  ],
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 150,
+                child: _WorkField(
+                  label: 'Date',
+                  controller: dateController,
+                  onChanged: () => setState(() {}),
+                  hint: 'YYYY-MM-DD',
+                  required: true,
+                  readOnly: true,
+                  onTap: _pickDate,
+                ),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 170,
+                child: _WorkField(
+                  label: 'Preparer',
+                  controller: preparerController,
+                  onChanged: () => setState(() {}),
+                  hint: 'Your name',
+                  required: true,
                 ),
               ),
             ],
@@ -5999,7 +5342,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                         'All tasks · triggers',
                                         style: TextStyle(
                                           fontSize: 10.5,
-                                          color: bg.withOpacity(0.7),
+                                          color: bg.withValues(alpha: 0.7),
                                           fontFamily: 'Courier',
                                           letterSpacing: 0.05,
                                         ),
@@ -6010,7 +5353,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                 Icon(
                                   Icons.layers_outlined,
                                   size: 14,
-                                  color: bg.withOpacity(0.7),
+                                  color: bg.withValues(alpha: 0.7),
                                 ),
                               ],
                             ),
@@ -6107,8 +5450,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                   boxShadow: active
                                       ? [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.04,
+                                            color: Colors.black.withValues(
+                                              alpha: 0.04,
                                             ),
                                             blurRadius: 2,
                                             offset: const Offset(0, 1),
@@ -6182,13 +5525,16 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                             color: ink4,
                                           ),
                                         ),
-                                        Text(
-                                          formatNumber(indiv),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: ink2,
-                                            fontFamily: 'Courier',
-                                            fontWeight: FontWeight.w500,
+                                        Flexible(
+                                          child: Text(
+                                            formatNumber(indiv),
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: ink2,
+                                              fontFamily: 'Courier',
+                                              fontWeight: FontWeight.w500,
+                                            ),
                                           ),
                                         ),
                                         Text(
@@ -6364,17 +5710,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
       required Widget child,
     }) {
       return _CollapsibleSection(
+        // Per-task key so switching tasks resets notes text and expansion
+        // state instead of bleeding Task A's state into Task B.
+        key: ValueKey('section-${identityHashCode(t)}-$stateKey'),
         title: title,
         initiallyExpanded:
             t.sectionExpansionStates[stateKey] ?? defaultExpanded,
         onExpansionChanged: (v) =>
             setState(() => t.sectionExpansionStates[stateKey] = v),
         notes: t.sectionNotes[stateKey],
-        onNotesChanged: (v) =>
-            setState(() => t.sectionNotes[stateKey] = v),
+        onNotesChanged: (v) => setState(() => t.sectionNotes[stateKey] = v),
         onShowFormula: formulaBuilder == null
             ? null
-            : () => showFormulaDialog(context, title, formulaBuilder()),
+            : () => _showFormulaDialog(context, title, formulaBuilder()),
         child: child,
       );
     }
@@ -6446,12 +5794,18 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final hours = t.hours;
                     final ph = totals['personHours']!;
                     return [
-                      _FormulaStep('Symbolic formula',
-                        r'\text{Person-Hours} = N_{workers} \times H_{each}'),
-                      _FormulaStep('Values substituted',
-                        '\\text{Person-Hours} = ${workers.toStringAsFixed(0)} \\times ${hours.toStringAsFixed(2)}'),
-                      _FormulaStep('Result',
-                        '\\text{Person-Hours} = ${ph.toStringAsFixed(2)}'),
+                      _FormulaStep(
+                        'Symbolic formula',
+                        r'\text{Person-Hours} = N_{workers} \times H_{each}',
+                      ),
+                      _FormulaStep(
+                        'Values substituted',
+                        '\\text{Person-Hours} = ${workers.toStringAsFixed(0)} \\times ${hours.toStringAsFixed(2)}',
+                      ),
+                      _FormulaStep(
+                        'Result',
+                        '\\text{Person-Hours} = ${ph.toStringAsFixed(2)}',
+                      ),
                     ];
                   },
                   child: Row(
@@ -6464,6 +5818,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           decoration: _numericDecoration(
                             const InputDecoration(labelText: '# Workers'),
                             (int.tryParse(t.workersController.text) ?? 0) < 0,
+                            t.workersController.text,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -6479,6 +5834,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           decoration: _numericDecoration(
                             const InputDecoration(labelText: 'Hours Each'),
                             (double.tryParse(t.hoursController.text) ?? 0) < 0,
+                            t.hoursController.text,
                           ),
                           onChanged: (_) => setState(() {}),
                         ),
@@ -6501,7 +5857,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   title: 'mPIF Calculation',
                   stateKey: 'mpifCalculation',
                   formulaBuilder: () {
-                    final effectiveC = t.mpifC == -1.0 ? (t.mpifCCustom ?? 0.0) : t.mpifC;
+                    final effectiveC = t.mpifC == -1.0
+                        ? (t.mpifCCustom ?? 0.0)
+                        : t.mpifC;
                     final mPIF = computeMPIF(t);
                     final r = t.mpifR ?? 1.0;
                     final d = t.mpifD;
@@ -6509,13 +5867,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final s = t.mpifS;
                     final u = t.mpifU;
                     return [
-                      _FormulaStep('Symbolic formula',
+                      _FormulaStep(
+                        'Symbolic formula',
                         r'mPIF = 1\times10^{-6} \times R \times C \times D \times O \times S \times U',
-                        comment: 'All factors from HPP 9.1 Attachment A'),
-                      _FormulaStep('Values substituted',
-                        'mPIF = 1\\times10^{-6} \\times $r \\times $effectiveC \\times $d \\times $o \\times $s \\times $u'),
-                      _FormulaStep('Result',
-                        'mPIF = ${mPIF.toStringAsExponential(3)}'),
+                        comment: 'All factors from HPP 9.1 Attachment A',
+                      ),
+                      _FormulaStep(
+                        'Values substituted',
+                        'mPIF = 1\\times10^{-6} \\times $r \\times $effectiveC \\times $d \\times $o \\times $s \\times $u',
+                      ),
+                      _FormulaStep(
+                        'Result',
+                        'mPIF = ${mPIF.toStringAsExponential(3)}',
+                      ),
                     ];
                   },
                   child: Column(
@@ -6550,8 +5914,8 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               hintText: 'Select or type C',
                               initialSelection:
                                   (t.mpifC > 0.0 || t.mpifC == -1.0)
-                                      ? t.mpifC
-                                      : null,
+                                  ? t.mpifC
+                                  : null,
                               expandedInsets: EdgeInsets.zero,
                               enableFilter: true,
                               dropdownMenuEntries: confinementFactors.entries
@@ -6641,18 +6005,20 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                             child: DropdownMenu<int>(
                               label: const Text('Uncertainty (U)'),
                               hintText: 'Select or type U',
-                              initialSelection:
-                                  t.mpifU > 0 ? t.mpifU.toInt() : null,
+                              initialSelection: t.mpifU > 0
+                                  ? t.mpifU.toInt()
+                                  : null,
                               expandedInsets: EdgeInsets.zero,
                               enableFilter: true,
-                              dropdownMenuEntries: List.generate(10, (i) => i + 1)
-                                  .map(
-                                    (v) => DropdownMenuEntry(
-                                      value: v,
-                                      label: '$v',
-                                    ),
-                                  )
-                                  .toList(),
+                              dropdownMenuEntries:
+                                  List.generate(10, (i) => i + 1)
+                                      .map(
+                                        (v) => DropdownMenuEntry(
+                                          value: v,
+                                          label: '$v',
+                                        ),
+                                      )
+                                      .toList(),
                               onSelected: (v) {
                                 if (v != null) {
                                   t.mpifU = v.toDouble();
@@ -6722,19 +6088,39 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final ph = totals['personHours']!;
                     final dr = t.doseRate;
                     final collective = totals['collectiveExternal']!;
-                    final individual = t.workers > 0 ? collective / t.workers : 0.0;
+                    final penalty = totals['respiratorPenalty'] ?? 1.0;
+                    final prePenalty = dr * ph;
+                    final individual = t.workers > 0
+                        ? collective / t.workers
+                        : 0.0;
                     return [
-                      _FormulaStep('Collective external dose',
+                      _FormulaStep(
+                        'Collective external dose',
                         r'D_{ext,collective} = \dot{D} \times \text{Person-Hours}',
-                        comment: 'Dose rate × total person-hours'),
-                      _FormulaStep('Values substituted',
-                        'D_{ext,collective} = ${dr.toStringAsFixed(2)} \\ \\text{mrem/hr} \\times ${ph.toStringAsFixed(2)} \\ \\text{hr}'),
-                      _FormulaStep('Collective result',
-                        'D_{ext,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
-                      _FormulaStep('Individual external dose',
-                        r'D_{ext,indiv} = D_{ext,collective} / N_{workers}'),
-                      _FormulaStep('Individual result',
-                        'D_{ext,indiv} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}'),
+                        comment: 'Dose rate × total person-hours',
+                      ),
+                      _FormulaStep(
+                        'Values substituted',
+                        'D_{ext,collective} = ${dr.toStringAsFixed(2)} \\ \\text{mrem/hr} \\times ${ph.toStringAsFixed(2)} \\ \\text{hr} = ${prePenalty.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ),
+                      if (penalty > 1.0)
+                        _FormulaStep(
+                          'Respirator time penalty',
+                          'D_{ext,collective} = ${prePenalty.toStringAsFixed(2)} \\times 1.15 = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                          comment: '15% work-rate penalty for respirator use',
+                        ),
+                      _FormulaStep(
+                        'Collective result',
+                        'D_{ext,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ),
+                      _FormulaStep(
+                        'Individual external dose',
+                        r'D_{ext,indiv} = D_{ext,collective} / N_{workers}',
+                      ),
+                      _FormulaStep(
+                        'Individual result',
+                        'D_{ext,indiv} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}',
+                      ),
                     ];
                   },
                   child: Column(
@@ -6746,7 +6132,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         ),
                         inputFormatters: [_NonNegativeFormatter()],
                         decoration: _numericDecoration(
-                          const InputDecoration(labelText: 'Dose Rate (mrem/hr)'),
+                          const InputDecoration(
+                            labelText: 'Dose Rate (mrem/hr)',
+                          ),
                           (double.tryParse(t.doseRateController.text) ?? 0) < 0,
                         ),
                         onChanged: (_) => setState(() {}),
@@ -6765,10 +6153,12 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           Expanded(
                             child: _MiniStat(
                               label: 'Individual External',
-                              value: (t.workers > 0
-                                      ? totals['collectiveExternal']! / t.workers
-                                      : 0.0)
-                                  .toStringAsFixed(2),
+                              value:
+                                  (t.workers > 0
+                                          ? totals['collectiveExternal']! /
+                                                t.workers
+                                          : 0.0)
+                                      .toStringAsFixed(2),
                               unit: 'mrem/person',
                               color: _kAccent,
                             ),
@@ -6799,22 +6189,32 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final collective = totals['collectiveExtremity']!;
                     final entryLines = t.extremities
                         .where((e) => e.doseRate > 0 && e.time > 0)
-                        .map((e) =>
-                            '${e.nuclide ?? "entry"}: ${e.doseRate.toStringAsFixed(2)} \\times ${e.time.toStringAsFixed(2)} = ${(e.doseRate * e.time).toStringAsFixed(2)}')
+                        .map(
+                          (e) =>
+                              '${e.nuclide ?? "entry"}: ${e.doseRate.toStringAsFixed(2)} \\times ${e.time.toStringAsFixed(2)} = ${(e.doseRate * e.time).toStringAsFixed(2)}',
+                        )
                         .join(r', \quad ');
                     return [
-                      _FormulaStep('Per-entry dose',
+                      _FormulaStep(
+                        'Per-entry dose',
                         r'D_{entry} = \dot{D}_{entry} \times T_{entry}',
-                        comment: 'Dose rate (mrem/hr) × time (hr) per extremity entry'),
+                        comment:
+                            'Dose rate (mrem/hr) × time (hr) per extremity entry',
+                      ),
                       if (entryLines.isNotEmpty)
-                        _FormulaStep('Entry values (mrem)',
-                          entryLines),
-                      _FormulaStep('Individual extremity dose',
-                        r'D_{ext,indiv} = \sum_{i} D_{entry,i}'),
-                      _FormulaStep('Individual result',
-                        'D_{ext,indiv} = ${indiv.toStringAsFixed(2)} \\ \\text{mrem/person}'),
-                      _FormulaStep('Collective extremity',
-                        'D_{ext,collective} = D_{ext,indiv} \\times N_{workers} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}'),
+                        _FormulaStep('Entry values (mrem)', entryLines),
+                      _FormulaStep(
+                        'Individual extremity dose',
+                        r'D_{ext,indiv} = \sum_{i} D_{entry,i}',
+                      ),
+                      _FormulaStep(
+                        'Individual result',
+                        'D_{ext,indiv} = ${indiv.toStringAsFixed(2)} \\ \\text{mrem/person}',
+                      ),
+                      _FormulaStep(
+                        'Collective extremity',
+                        'D_{ext,collective} = D_{ext,indiv} \\times N_{workers} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ),
                     ];
                   },
                   child: Column(
@@ -6822,6 +6222,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       ...List.generate(t.extremities.length, (ei) {
                         final e = t.extremities[ei];
                         return Padding(
+                          key: ObjectKey(e),
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
@@ -6865,47 +6266,64 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                     e.nuclide = s;
                                     setState(() {});
                                   },
-                                  fieldViewBuilder: (ctx, ctrl, fn, onFieldSubmitted) {
-                                    ctrl.text = e.nuclide ?? '';
-                                    final all = [
-                                      'Other',
-                                      'Various',
-                                      ...NuclideData.dacValues.keys,
-                                    ];
-                                    void commitTopMatch() {
-                                      final query = ctrl.text.trim();
-                                      if (query.isEmpty) return;
-                                      final matches = all.where(
-                                        (k) => k.toLowerCase().contains(query.toLowerCase()),
-                                      );
-                                      if (matches.isNotEmpty) {
-                                        e.nuclide = matches.first;
-                                        ctrl.text = matches.first;
-                                        onFieldSubmitted();
-                                        setState(() {});
-                                      }
-                                    }
-                                    return TextField(
-                                      controller: ctrl,
-                                      focusNode: fn,
-                                      decoration: const InputDecoration(
-                                        hintText: 'Nuclide',
-                                      ),
-                                      onSubmitted: (_) => commitTopMatch(),
-                                      onEditingComplete: commitTopMatch,
-                                    );
-                                  },
+                                  fieldViewBuilder:
+                                      (ctx, ctrl, fn, onFieldSubmitted) {
+                                        if (!fn.hasFocus &&
+                                            ctrl.text != (e.nuclide ?? '')) {
+                                          ctrl.text = e.nuclide ?? '';
+                                        }
+                                        final all = [
+                                          'Other',
+                                          'Various',
+                                          ...NuclideData.dacValues.keys,
+                                        ];
+                                        void commitTopMatch() {
+                                          final query = ctrl.text.trim();
+                                          if (query.isEmpty) return;
+                                          final matches = all.where(
+                                            (k) => k.toLowerCase().contains(
+                                              query.toLowerCase(),
+                                            ),
+                                          );
+                                          if (matches.isNotEmpty) {
+                                            e.nuclide = matches.first;
+                                            ctrl.text = matches.first;
+                                            onFieldSubmitted();
+                                            setState(() {});
+                                          }
+                                        }
+
+                                        return TextField(
+                                          controller: ctrl,
+                                          focusNode: fn,
+                                          decoration: const InputDecoration(
+                                            hintText: 'Nuclide',
+                                          ),
+                                          onSubmitted: (_) => commitTopMatch(),
+                                          onEditingComplete: commitTopMatch,
+                                        );
+                                      },
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: TextField(
                                   controller: e.doseRateController,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   inputFormatters: [_NonNegativeFormatter()],
                                   decoration: _numericDecoration(
-                                    const InputDecoration(labelText: 'Dose Rate (mrem/hr)'),
-                                    (double.tryParse(e.doseRateController.text) ?? 0) < 0,
+                                    const InputDecoration(
+                                      labelText: 'Dose Rate (mrem/hr)',
+                                    ),
+                                    (double.tryParse(
+                                              e.doseRateController.text,
+                                            ) ??
+                                            0) <
+                                        0,
+                                    e.doseRateController.text,
                                   ),
                                   onChanged: (v) => setState(() {
                                     e.doseRate = double.tryParse(v) ?? 0.0;
@@ -6916,11 +6334,19 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               Expanded(
                                 child: TextField(
                                   controller: e.timeController,
-                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
                                   inputFormatters: [_NonNegativeFormatter()],
                                   decoration: _numericDecoration(
-                                    const InputDecoration(labelText: 'Time (hr)'),
-                                    (double.tryParse(e.timeController.text) ?? 0) < 0,
+                                    const InputDecoration(
+                                      labelText: 'Time (hr)',
+                                    ),
+                                    (double.tryParse(e.timeController.text) ??
+                                            0) <
+                                        0,
+                                    e.timeController.text,
                                   ),
                                   onChanged: (v) => setState(() {
                                     e.time = double.tryParse(v) ?? 0.0;
@@ -6929,10 +6355,15 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                               ),
                               const SizedBox(width: 4),
                               IconButton(
-                                onPressed: () => setState(() {
-                                  e.disposeControllers();
-                                  t.extremities.removeAt(ei);
-                                }),
+                                tooltip: 'Remove entry',
+                                onPressed: () {
+                                  setState(() {
+                                    t.extremities.removeAt(ei);
+                                  });
+                                  WidgetsBinding.instance.addPostFrameCallback(
+                                    (_) => e.disposeControllers(),
+                                  );
+                                },
                                 icon: const Icon(
                                   Icons.remove_circle_outline,
                                   color: _kDanger,
@@ -6992,20 +6423,33 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final pfr = t.pfr;
                     final combined = pfe * pfr;
                     return [
-                      _FormulaStep('Engineering control factor (PFE)',
+                      _FormulaStep(
+                        'Engineering control factor (PFE)',
                         r'\text{PFE} = \frac{\text{airborne concentration without controls}}{\text{airborne concentration with controls}}',
-                        comment: 'Ventilation/engineering controls reduce airborne concentration'),
-                      _FormulaStep('Respirator factor (PFR)',
+                        comment:
+                            'Ventilation/engineering controls reduce airborne concentration',
+                      ),
+                      _FormulaStep(
+                        'Respirator factor (PFR)',
                         r'\text{PFR} = \frac{1}{\text{APF}} \quad \Rightarrow \quad \text{PFR} = ${(1/pfr).toStringAsFixed(5)}',
-                        comment: 'Assigned Protection Factor of respirator'),
-                      _FormulaStep('Combined protection',
-                        r'PF_{combined} = PFE \times PFR'),
-                      _FormulaStep('Values substituted',
-                        'PF_{combined} = ${pfe.toStringAsExponential(1)} \\times ${pfr.toStringAsExponential(1)}'),
-                      _FormulaStep('Result',
-                        'PF_{combined} = ${combined.toStringAsExponential(2)}'),
-                      _FormulaStep('Respirator penalty',
-                        r'\text{If respirator used: dose} \times 1.15 \text{ (15\% work rate penalty)}'),
+                        comment: 'Assigned Protection Factor of respirator',
+                      ),
+                      _FormulaStep(
+                        'Combined protection',
+                        r'PF_{combined} = PFE \times PFR',
+                      ),
+                      _FormulaStep(
+                        'Values substituted',
+                        'PF_{combined} = ${pfe.toStringAsExponential(1)} \\times ${pfr.toStringAsExponential(1)}',
+                      ),
+                      _FormulaStep(
+                        'Result',
+                        'PF_{combined} = ${combined.toStringAsExponential(2)}',
+                      ),
+                      _FormulaStep(
+                        'Respirator penalty',
+                        r'\text{If respirator used: dose} \times 1.15 \text{ (15\% work rate penalty)}',
+                      ),
                     ];
                   },
                   child: Column(
@@ -7044,122 +6488,116 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                           ),
                         ),
                       Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Respiratory (PFR)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.6),
-                              ),
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Respiratory (PFR)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                RadioGroup<double>(
+                                  groupValue: t.pfr,
+                                  onChanged: (v) {
+                                    if (v == null) return;
+                                    setState(() => t.pfr = v);
+                                  },
+                                  child: const Column(
+                                    children: [
+                                      RadioListTile<double>(
+                                        value: 1.0,
+                                        title: Text(
+                                          'None (PFR=1)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                      RadioListTile<double>(
+                                        value: 50.0,
+                                        title: Text(
+                                          'APR (PFR=50)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                      RadioListTile<double>(
+                                        value: 1000.0,
+                                        title: Text(
+                                          'PAPR (PFR=1000)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            RadioListTile<double>(
-                              value: 1.0,
-                              groupValue: t.pfr,
-                              title: const Text(
-                                'None (PFR=1)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfr = v!;
-                                setState(() {});
-                              },
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Engineering (PFE)',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                RadioGroup<double>(
+                                  groupValue: t.pfe,
+                                  onChanged: (v) {
+                                    if (v == null) return;
+                                    setState(() => t.pfe = v);
+                                  },
+                                  child: const Column(
+                                    children: [
+                                      RadioListTile<double>(
+                                        value: 1.0,
+                                        title: Text(
+                                          'No Controls (PFE=1)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                      RadioListTile<double>(
+                                        value: 1000.0,
+                                        title: Text(
+                                          'Type I (PFE=1,000)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                      RadioListTile<double>(
+                                        value: 100000.0,
+                                        title: Text(
+                                          'Type II (PFE=100,000)',
+                                          style: TextStyle(fontSize: 13),
+                                        ),
+                                        dense: true,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                            RadioListTile<double>(
-                              value: 50.0,
-                              groupValue: t.pfr,
-                              title: const Text(
-                                'APR (PFR=50)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfr = v!;
-                                setState(() {});
-                              },
-                            ),
-                            RadioListTile<double>(
-                              value: 1000.0,
-                              groupValue: t.pfr,
-                              title: const Text(
-                                'PAPR (PFR=1000)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfr = v!;
-                                setState(() {});
-                              },
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Engineering (PFE)',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withOpacity(0.6),
-                              ),
-                            ),
-                            RadioListTile<double>(
-                              value: 1.0,
-                              groupValue: t.pfe,
-                              title: const Text(
-                                'No Controls (PFE=1)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfe = v!;
-                                setState(() {});
-                              },
-                            ),
-                            RadioListTile<double>(
-                              value: 1000.0,
-                              groupValue: t.pfe,
-                              title: const Text(
-                                'Type I (PFE=1,000)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfe = v!;
-                                setState(() {});
-                              },
-                            ),
-                            RadioListTile<double>(
-                              value: 100000.0,
-                              groupValue: t.pfe,
-                              title: const Text(
-                                'Type II (PFE=100,000)',
-                                style: TextStyle(fontSize: 13),
-                              ),
-                              dense: true,
-                              onChanged: (v) {
-                                t.pfe = v!;
-                                setState(() {});
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
                     ],
                   ),
                 ),
@@ -7173,18 +6611,34 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                     final mPIF = computeMPIF(t);
                     final ph = totals['personHours']!;
                     final collective = totals['collectiveInternal']!;
-                    final individual = t.workers > 0 ? collective / t.workers : 0.0;
+                    final individual = t.workers > 0
+                        ? collective / t.workers
+                        : 0.0;
                     final pfe = t.pfe == 0.0 ? 1.0 : t.pfe;
                     final pfr = t.pfr == 0.0 ? 1.0 : t.pfr;
+                    final penalty = totals['respiratorPenalty'] ?? 1.0;
+                    // Pre-penalty sum of the per-nuclide doses shown above,
+                    // so the displayed arithmetic actually adds up.
+                    double prePenalty = 0.0;
+                    for (final n in t.nuclides) {
+                      prePenalty +=
+                          computeNuclideDose(n, t)['collective'] ?? 0.0;
+                    }
 
                     final steps = <_FormulaStep>[
-                      _FormulaStep('Symbolic — air concentration',
+                      _FormulaStep(
+                        'Symbolic — air concentration',
                         r'C_{air} = \frac{\%\text{contam}}{100} \times mPIF \times \frac{1}{100} \times \frac{1}{2.22\times10^6}',
-                        comment: 'Converts % contamination to µCi/mL'),
-                      _FormulaStep('Symbolic — DAC fraction',
-                        r'\text{DAC-frac}_{eng} = \frac{C_{air}}{DAC \times PFE}'),
-                      _FormulaStep('Symbolic — collective dose per nuclide',
-                        r'D_i = \frac{\text{DAC-frac}_{eng,i} \times \text{Person-Hours}}{2000} \times \frac{5000}{PFR}'),
+                        comment: 'Converts % contamination to µCi/mL',
+                      ),
+                      _FormulaStep(
+                        'Symbolic — DAC fraction',
+                        r'\text{DAC-frac}_{eng} = \frac{C_{air}}{DAC \times PFE}',
+                      ),
+                      _FormulaStep(
+                        'Symbolic — collective dose per nuclide',
+                        r'D_i = \frac{\text{DAC-frac}_{eng,i} \times \text{Person-Hours}}{2000} \times \frac{5000}{PFR}',
+                      ),
                     ];
 
                     // Per-nuclide substituted values
@@ -7197,40 +6651,66 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                       final nuclideCollective = res['collective'] ?? 0.0;
                       final contam = n.contam;
 
-                      steps.add(_FormulaStep(
-                        '$label — air conc.',
-                        'C_{air} = \\frac{${contam.toStringAsFixed(1)}}{100} \\times ${mPIF.toStringAsExponential(3)} \\times \\frac{1}{100} \\times \\frac{1}{2.22\\times10^6} = ${airConc.toStringAsExponential(3)} \\ \\mu\\text{Ci/mL}',
-                      ));
-                      steps.add(_FormulaStep(
-                        '$label — DAC fraction',
-                        '\\text{DAC-frac}_{eng} = \\frac{${airConc.toStringAsExponential(3)}}{${dac.toStringAsExponential(3)} \\times ${pfe.toStringAsExponential(1)}} = ${dacFrEng.toStringAsExponential(3)}',
-                      ));
-                      steps.add(_FormulaStep(
-                        '$label — collective dose',
-                        'D_{${label}} = \\frac{${dacFrEng.toStringAsExponential(3)} \\times ${ph.toStringAsFixed(2)}}{2000} \\times \\frac{5000}{${pfr.toStringAsFixed(1)}} = ${nuclideCollective.toStringAsFixed(2)} \\ \\text{mrem}',
-                      ));
+                      steps.add(
+                        _FormulaStep(
+                          '$label — air conc.',
+                          'C_{air} = \\frac{${contam.toStringAsFixed(1)}}{100} \\times ${mPIF.toStringAsExponential(3)} \\times \\frac{1}{100} \\times \\frac{1}{2.22\\times10^6} = ${airConc.toStringAsExponential(3)} \\ \\mu\\text{Ci/mL}',
+                        ),
+                      );
+                      steps.add(
+                        _FormulaStep(
+                          '$label — DAC fraction',
+                          '\\text{DAC-frac}_{eng} = \\frac{${airConc.toStringAsExponential(3)}}{${dac.toStringAsExponential(3)} \\times ${pfe.toStringAsExponential(1)}} = ${dacFrEng.toStringAsExponential(3)}',
+                        ),
+                      );
+                      steps.add(
+                        _FormulaStep(
+                          '$label — collective dose',
+                          'D_{$label} = \\frac{${dacFrEng.toStringAsExponential(3)} \\times ${ph.toStringAsFixed(2)}}{2000} \\times \\frac{5000}{${pfr.toStringAsFixed(1)}} = ${nuclideCollective.toStringAsFixed(2)} \\ \\text{mrem}',
+                        ),
+                      );
                     }
 
                     // Summation if multiple nuclides
                     if (t.nuclides.length > 1) {
-                      final sumParts = t.nuclides.map((n) {
-                        final res = computeNuclideDose(n, t);
-                        return (res['collective'] ?? 0.0).toStringAsFixed(2);
-                      }).join(' + ');
-                      steps.add(_FormulaStep(
-                        'Total collective (sum of nuclides)',
-                        'D_{int,collective} = $sumParts = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
-                      ));
+                      final sumParts = t.nuclides
+                          .map((n) {
+                            final res = computeNuclideDose(n, t);
+                            return (res['collective'] ?? 0.0).toStringAsFixed(
+                              2,
+                            );
+                          })
+                          .join(' + ');
+                      steps.add(
+                        _FormulaStep(
+                          'Total collective (sum of nuclides)',
+                          'D_{int,collective} = $sumParts = ${prePenalty.toStringAsFixed(2)} \\ \\text{mrem}',
+                        ),
+                      );
                     }
 
-                    steps.add(_FormulaStep(
-                      'Collective internal result',
-                      'D_{int,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
-                    ));
-                    steps.add(_FormulaStep(
-                      'Individual internal result',
-                      'D_{int,indiv} = \\frac{${collective.toStringAsFixed(2)}}{${t.workers.toStringAsFixed(0)}} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}',
-                    ));
+                    if (penalty > 1.0) {
+                      steps.add(
+                        _FormulaStep(
+                          'Respirator time penalty',
+                          'D_{int,collective} = ${prePenalty.toStringAsFixed(2)} \\times 1.15 = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                          comment: '15% work-rate penalty for respirator use',
+                        ),
+                      );
+                    }
+
+                    steps.add(
+                      _FormulaStep(
+                        'Collective internal result',
+                        'D_{int,collective} = ${collective.toStringAsFixed(2)} \\ \\text{mrem}',
+                      ),
+                    );
+                    steps.add(
+                      _FormulaStep(
+                        'Individual internal result',
+                        'D_{int,indiv} = \\frac{${collective.toStringAsFixed(2)}}{${t.workers.toStringAsFixed(0)}} = ${individual.toStringAsFixed(2)} \\ \\text{mrem/person}',
+                      ),
+                    );
 
                     return steps;
                   },
@@ -7246,6 +6726,9 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                         final nuclideIndiv = res['individual'] ?? 0.0;
 
                         return Column(
+                          // Key rows by entry identity so removing a row
+                          // doesn't shift autocomplete text onto the wrong one.
+                          key: ObjectKey(n),
                           children: [
                             Row(
                               children: [
@@ -7271,7 +6754,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                               ),
                                             ),
                                       optionsViewBuilder:
-                                          (ctx, onSelected, options) => Material(
+                                          (
+                                            ctx,
+                                            onSelected,
+                                            options,
+                                          ) => Material(
                                             elevation: 4,
                                             child: ConstrainedBox(
                                               constraints: const BoxConstraints(
@@ -7292,11 +6779,14 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                                     dense: true,
                                                     title: Text(opt),
                                                     subtitle: opt == 'Other'
-                                                        ? const Text('Custom DAC')
+                                                        ? const Text(
+                                                            'Custom DAC',
+                                                          )
                                                         : Text(
                                                             'DAC: ${formatNumber(d)}',
                                                           ),
-                                                    onTap: () => onSelected(opt),
+                                                    onTap: () =>
+                                                        onSelected(opt),
                                                   );
                                                 },
                                               ),
@@ -7310,78 +6800,99 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                         }
                                         setState(() {});
                                       },
-                                      fieldViewBuilder: (ctx, ctrl, fn, onFieldSubmitted) {
-                                        if (!fn.hasFocus) {
-                                          ctrl.text = n.name ?? '';
-                                        }
-                                        void commitTopMatch() {
-                                          final query = ctrl.text.trim();
-                                          if (query.isEmpty) return;
-                                          final matches = NuclideData.dacValues.keys.where(
-                                            (k) => k.toLowerCase().contains(query.toLowerCase()),
-                                          );
-                                          if (matches.isNotEmpty) {
-                                            n.name = matches.first;
-                                            if (matches.first != 'Other') { n.customDAC = null; n.dacController.clear(); }
-                                            ctrl.text = matches.first;
-                                            onFieldSubmitted();
-                                            setState(() {});
-                                          }
-                                        }
-                                        return TextField(
-                                          controller: ctrl,
-                                          focusNode: fn,
-                                          decoration: const InputDecoration(
-                                            labelText: 'Nuclide',
-                                            hintText: 'Select radionuclide',
-                                          ),
-                                          onSubmitted: (_) => commitTopMatch(),
-                                          onEditingComplete: commitTopMatch,
-                                        );
-                                      },
+                                      fieldViewBuilder:
+                                          (ctx, ctrl, fn, onFieldSubmitted) {
+                                            // Only reset when out of focus AND the
+                                            // text actually differs — avoids
+                                            // notify-during-build and preserves
+                                            // in-progress typing.
+                                            if (!fn.hasFocus &&
+                                                ctrl.text != (n.name ?? '')) {
+                                              ctrl.text = n.name ?? '';
+                                            }
+                                            void commitTopMatch() {
+                                              final query = ctrl.text.trim();
+                                              if (query.isEmpty) return;
+                                              final matches = NuclideData
+                                                  .dacValues
+                                                  .keys
+                                                  .where(
+                                                    (k) => k
+                                                        .toLowerCase()
+                                                        .contains(
+                                                          query.toLowerCase(),
+                                                        ),
+                                                  );
+                                              if (matches.isNotEmpty) {
+                                                n.name = matches.first;
+                                                if (matches.first != 'Other') {
+                                                  n.customDAC = null;
+                                                  n.dacController.clear();
+                                                }
+                                                ctrl.text = matches.first;
+                                                onFieldSubmitted();
+                                                setState(() {});
+                                              }
+                                            }
+
+                                            return TextField(
+                                              controller: ctrl,
+                                              focusNode: fn,
+                                              decoration: const InputDecoration(
+                                                labelText: 'Nuclide',
+                                                hintText: 'Select radionuclide',
+                                              ),
+                                              onSubmitted: (_) =>
+                                                  commitTopMatch(),
+                                              onEditingComplete: commitTopMatch,
+                                            );
+                                          },
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
-                                  child: TextField(
-                                    // Key forces rebuild when nuclide changes so
-                                    // the read-only display always shows the
-                                    // correct DAC for the selected nuclide.
-                                    key: ValueKey('dac_${n.name}_$ni'),
-                                    controller: n.name == 'Other'
-                                        ? n.dacController
-                                        : TextEditingController(
-                                            text: n.name != null
-                                                ? formatNumber(dac)
-                                                : '',
+                                  child: n.name == 'Other'
+                                      ? TextField(
+                                          controller: n.dacController,
+                                          keyboardType:
+                                              const TextInputType.numberWithOptions(
+                                                decimal: true,
+                                              ),
+                                          inputFormatters: [
+                                            FilteringTextInputFormatter.allow(
+                                              RegExp(r'[0-9eE+\-\.]'),
+                                            ),
+                                            _NonNegativeFormatter(),
+                                          ],
+                                          decoration: _numericDecoration(
+                                            const InputDecoration(
+                                              labelText: 'DAC (µCi/mL)',
+                                              hintText: 'Enter custom DAC',
+                                            ),
+                                            (double.tryParse(
+                                                      n.dacController.text,
+                                                    ) ??
+                                                    0) <
+                                                0,
+                                            n.dacController.text,
                                           ),
-                                    readOnly: n.name != 'Other',
-                                    enabled: n.name == 'Other',
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
+                                          onChanged: (_) => setState(() {}),
+                                        )
+                                      // Read-only display — no throwaway
+                                      // controller (framework owns its state).
+                                      : TextFormField(
+                                          key: ValueKey('dac_${n.name}_$ni'),
+                                          initialValue: n.name != null
+                                              ? formatNumber(dac)
+                                              : '',
+                                          readOnly: true,
+                                          enabled: false,
+                                          decoration: const InputDecoration(
+                                            labelText: 'DAC (µCi/mL)',
+                                            hintText: 'Select nuclide',
+                                          ),
                                         ),
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.allow(
-                                        RegExp(r'[0-9eE+\-\.]'),
-                                      ),
-                                      _NonNegativeFormatter(),
-                                    ],
-                                    decoration: _numericDecoration(
-                                      InputDecoration(
-                                        labelText: 'DAC (µCi/mL)',
-                                        hintText: n.name == 'Other'
-                                            ? 'Enter custom DAC'
-                                            : (n.name == null
-                                                  ? 'Select nuclide'
-                                                  : ''),
-                                      ),
-                                      n.name == 'Other' &&
-                                          (double.tryParse(n.dacController.text) ?? 0) < 0,
-                                    ),
-                                    onChanged: (_) => setState(() {}),
-                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -7398,19 +6909,38 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                                       _NonNegativeFormatter(),
                                     ],
                                     decoration: _numericDecoration(
-                                      const InputDecoration(
+                                      InputDecoration(
                                         labelText: 'Contam. (dpm/100cm²)',
+                                        // Rows without a nuclide contribute
+                                        // nothing — make that visible.
+                                        errorText:
+                                            n.name == null && n.contam > 0
+                                            ? 'Select a nuclide — row excluded'
+                                            : null,
                                       ),
-                                      (double.tryParse(n.contamController.text) ?? 0) < 0,
+                                      (double.tryParse(
+                                                n.contamController.text,
+                                              ) ??
+                                              0) <
+                                          0,
+                                      n.contamController.text,
                                     ),
                                     onChanged: (_) => setState(() {}),
                                   ),
                                 ),
                                 IconButton(
-                                  onPressed: () => setState(() {
-                                    n.disposeControllers();
-                                    t.nuclides.removeAt(ni);
-                                  }),
+                                  tooltip: 'Remove nuclide',
+                                  onPressed: () {
+                                    setState(() {
+                                      t.nuclides.removeAt(ni);
+                                    });
+                                    // Dispose after the rebuild lands so a
+                                    // focused field never uses dead controllers.
+                                    WidgetsBinding.instance
+                                        .addPostFrameCallback((_) {
+                                          n.disposeControllers();
+                                        });
+                                  },
                                   icon: const Icon(
                                     Icons.remove_circle_outline,
                                     color: _kDanger,
@@ -7738,49 +7268,7 @@ class _TaskRightRail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-            decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: hairline)),
-            ),
-            child: Row(
-              children: [
-                Text(
-                  'LIVE RESULTS',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: ink3,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.1,
-                  ),
-                ),
-                const Spacer(),
-                Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: _kOk,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'TASK',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: ink3,
-                        fontFamily: 'Courier',
-                        letterSpacing: 0.06,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          const SizedBox(height: 16),
           Expanded(
             child: SingleChildScrollView(
               child: Column(
@@ -7824,11 +7312,11 @@ class _TaskRightRail extends StatelessWidget {
                       big: true,
                     ),
                     metric(
-                      'Σ DAC fraction (eng only)',
+                      'Σ DAC fraction (after engineering controls)',
                       formatNumber(totals['totalDacFractionEngOnly'] ?? 0.0),
                     ),
                     metric(
-                      'Internal dose (after resp)',
+                      'Internal dose (after respiratory protection)',
                       formatNumber(indivInt),
                       unit: 'mrem',
                       level: indivLevel,

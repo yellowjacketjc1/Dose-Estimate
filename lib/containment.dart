@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'calc/containment_calculator.dart' as calc;
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -61,13 +62,29 @@ class NuclideMixEntry {
   double fraction;
   double dac;
   final TextEditingController nameController;
+  final FocusNode nameFocusNode;
 
   NuclideMixEntry({required this.name, this.fraction = 0.0, this.dac = 0.0})
     : key = UniqueKey(),
-      nameController = TextEditingController(text: name);
+      nameController = TextEditingController(text: name),
+      nameFocusNode = FocusNode();
 
   void dispose() {
     nameController.dispose();
+    nameFocusNode.dispose();
+  }
+}
+
+/// Blocks negative input while still allowing in-progress scientific
+/// notation like "1e-8" (mirrors _NonNegativeFormatter in main.dart).
+class _NonNegativeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.startsWith('-')) return oldValue;
+    return newValue;
   }
 }
 
@@ -193,6 +210,7 @@ class ContainmentTabState extends State<ContainmentTab>
   // Source Term State
   List<NuclideMixEntry> sourceTerm = [];
   bool useContaminationInput = false;
+  bool areaInCm2 = false; // false = ft² (default), true = cm²
 
   @override
   void initState() {
@@ -256,6 +274,7 @@ class ContainmentTabState extends State<ContainmentTab>
       bioassayThreshold = null;
       bioassayRequired = null;
       useContaminationInput = false;
+      areaInCm2 = false;
     });
     addNuclideRow();
   }
@@ -298,7 +317,9 @@ class ContainmentTabState extends State<ContainmentTab>
             ),
           )
           .toList();
-      if (sourceTerm.isEmpty) sourceTerm.add(NuclideMixEntry(name: '', fraction: 0.0, dac: 0.0));
+      if (sourceTerm.isEmpty) {
+        sourceTerm.add(NuclideMixEntry(name: '', fraction: 0.0, dac: 0.0));
+      }
     });
     calculate();
   }
@@ -342,16 +363,21 @@ class ContainmentTabState extends State<ContainmentTab>
 
   void calculateContamination() {
     final contam = double.tryParse(contaminationController.text) ?? 0.0;
-    final areaFt2 = double.tryParse(areaController.text) ?? 0.0;
+    final area = double.tryParse(areaController.text) ?? 0.0;
 
-    if (contam > 0 && areaFt2 > 0) {
-      // Convert ft² → cm²: 1 ft² = 929.03 cm²
-      final areaCm2 = areaFt2 * 929.03;
-      final totalDpm = contam * (areaCm2 / 100.0);
-      final totalUci = totalDpm / 2.22e6;
+    final totalUci = calc.activityFromContamination(
+      contam,
+      area,
+      areaInCm2: areaInCm2,
+    );
+    if (totalUci != null) {
       totalActivityController.text = totalUci.toStringAsExponential(3);
-      calculate();
+    } else {
+      // Inputs cleared/invalid — clear the derived activity so downstream
+      // results don't stay frozen at a stale value.
+      totalActivityController.clear();
     }
+    calculate();
   }
 
   void calculate() {
@@ -363,20 +389,20 @@ class ContainmentTabState extends State<ContainmentTab>
     final uncertainty = double.tryParse(uncertaintyController.text) ?? 1.0;
 
     // --- PIF Calculation (independent of containment inputs) ---
-    // PIF = R * C * D * O * S * U * 1e-6
     double? pif;
     if (selectedPifRelease != null &&
         selectedConfinement != null &&
         selectedDispersibility != null &&
         selectedOccupancy != null &&
         selectedSpecialForm != null) {
-      final R = selectedPifRelease!.value;
-      final C = selectedConfinement!.pifC;
-      final D = selectedDispersibility!.value;
-      final O = selectedOccupancy!.value;
-      final S = selectedSpecialForm!.value;
-      final U = uncertainty;
-      pif = R * C * D * O * S * U * 1e-6;
+      pif = calc.computePif(
+        r: selectedPifRelease!.value,
+        c: selectedConfinement!.pifC,
+        d: selectedDispersibility!.value,
+        o: selectedOccupancy!.value,
+        s: selectedSpecialForm!.value,
+        u: uncertainty,
+      );
     }
 
     if (activity == null ||
@@ -397,40 +423,24 @@ class ContainmentTabState extends State<ContainmentTab>
       return;
     }
 
-    // --- Containment Calculation ---
-    double totalResult = 0.0;
-    for (final entry in sourceTerm) {
-      if (entry.dac <= 0) continue;
-      final nuclideActivity = activity * entry.fraction;
-      final numerator = nuclideActivity * fr * fa * uncertainty;
-      final denominator = 2000 * volume * mixing * entry.dac;
-      if (denominator > 0) {
-        totalResult += numerator / denominator;
-      }
-    }
-
-    // --- Bioassay Threshold ---
-    double sumRisk = 0.0;
-    for (final entry in sourceTerm) {
-      if (entry.dac <= 0) continue;
-      final ali = entry.dac * 2.4e9;
-      if (ali > 0) {
-        sumRisk += entry.fraction / ali;
-      }
-    }
-
-    double threshold = 0.0;
-    if (sumRisk > 0 && pif != null && pif > 0) {
-      threshold = 0.02 / (pif * sumRisk);
-    }
+    final result = calc.computeContainment(
+      activity: activity,
+      volume: volume,
+      mixing: mixing,
+      fa: fa,
+      fr: fr,
+      uncertainty: uncertainty,
+      rows: sourceTerm.map((e) => (fraction: e.fraction, dac: e.dac)).toList(),
+      pif: pif,
+    );
 
     setState(() {
-      calculatedResult = totalResult;
-      isSufficient = totalResult <= 0.02;
+      calculatedResult = result.sumOfFractions;
+      isSufficient = result.isSufficient;
 
       pifResult = pif;
-      bioassayThreshold = threshold;
-      bioassayRequired = activity > threshold;
+      bioassayThreshold = result.bioassayThreshold;
+      bioassayRequired = result.bioassayRequired;
     });
   }
 
@@ -510,6 +520,7 @@ class ContainmentTabState extends State<ContainmentTab>
     'selectedDispersibility': selectedDispersibility?.name,
     'selectedSpecialForm': selectedSpecialForm?.name,
     'useContaminationInput': useContaminationInput,
+    'areaInCm2': areaInCm2,
     'controllers': {
       'totalActivity': totalActivityController.text,
       'volume': volumeController.text,
@@ -582,6 +593,7 @@ class ContainmentTabState extends State<ContainmentTab>
           specialFormTypes[0];
 
       useContaminationInput = state['useContaminationInput'] == true;
+      areaInCm2 = state['areaInCm2'] == true;
 
       totalActivityController.text = (controllers['totalActivity'] ?? '')
           .toString();
@@ -597,8 +609,8 @@ class ContainmentTabState extends State<ContainmentTab>
       contaminationController.text = (controllers['contamination'] ?? '')
           .toString();
       areaController.text = (controllers['area'] ?? '').toString();
-      frJustificationController.text =
-          (controllers['frJustification'] ?? '').toString();
+      frJustificationController.text = (controllers['frJustification'] ?? '')
+          .toString();
 
       for (final entry in sourceTerm) {
         entry.dispose();
@@ -737,37 +749,33 @@ class ContainmentTabState extends State<ContainmentTab>
                       ],
                     ),
                     // Data rows
-                    ...sourceTerm
-                        .map(
-                          (entry) => pw.TableRow(
-                            children: [
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(6),
-                                child: pw.Text(
-                                  entry.name.isEmpty
-                                      ? 'Not specified'
-                                      : entry.name,
-                                  style: const pw.TextStyle(fontSize: 10),
-                                ),
-                              ),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(6),
-                                child: pw.Text(
-                                  entry.fraction.toStringAsFixed(4),
-                                  style: const pw.TextStyle(fontSize: 10),
-                                ),
-                              ),
-                              pw.Padding(
-                                padding: const pw.EdgeInsets.all(6),
-                                child: pw.Text(
-                                  entry.dac.toStringAsExponential(2),
-                                  style: const pw.TextStyle(fontSize: 10),
-                                ),
-                              ),
-                            ],
+                    ...sourceTerm.map(
+                      (entry) => pw.TableRow(
+                        children: [
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(6),
+                            child: pw.Text(
+                              entry.name.isEmpty ? 'Not specified' : entry.name,
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
                           ),
-                        )
-                        .toList(),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(6),
+                            child: pw.Text(
+                              entry.fraction.toStringAsFixed(4),
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          ),
+                          pw.Padding(
+                            padding: const pw.EdgeInsets.all(6),
+                            child: pw.Text(
+                              entry.dac.toStringAsExponential(2),
+                              style: const pw.TextStyle(fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
                 pw.SizedBox(height: 20),
@@ -866,6 +874,23 @@ class ContainmentTabState extends State<ContainmentTab>
                       ],
                     ),
                   ),
+                ] else ...[
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(12),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      border: pw.Border.all(color: PdfColors.grey400),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(4),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'Containment result not evaluable — verify total activity, '
+                      'room parameters, and that every source-term row with a '
+                      'fraction > 0 has a recognized nuclide (DAC).',
+                      style: const pw.TextStyle(fontSize: 10),
+                    ),
+                  ),
                 ],
                 pw.SizedBox(height: 20),
 
@@ -956,6 +981,22 @@ class ContainmentTabState extends State<ContainmentTab>
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                ] else ...[
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(10),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey100,
+                      border: pw.Border.all(color: PdfColors.grey400),
+                      borderRadius: const pw.BorderRadius.all(
+                        pw.Radius.circular(4),
+                      ),
+                    ),
+                    child: pw.Text(
+                      'Bioassay assessment not evaluable — requires a release '
+                      'pathway (PIF > 0) and a resolved source term.',
+                      style: const pw.TextStyle(fontSize: 10),
                     ),
                   ),
                 ],
@@ -1067,36 +1108,44 @@ class ContainmentTabState extends State<ContainmentTab>
         runSpacing: 6,
         children: options.map((o) {
           final isSelected = selected == o;
-          return GestureDetector(
-            onTap: () => onTap(o),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 130),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? _accent : surface3,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: isSelected ? _accent : cardBorder),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label(o),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.white : ink2,
+          return MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => onTap(o),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 130),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? _accent : surface3,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: isSelected ? _accent : cardBorder),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label(o),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: isSelected ? Colors.white : ink2,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    sublabel(o),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isSelected ? Colors.white.withOpacity(0.75) : ink4,
+                    const SizedBox(width: 5),
+                    Text(
+                      sublabel(o),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.75)
+                            : ink4,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -1262,9 +1311,17 @@ class ContainmentTabState extends State<ContainmentTab>
                           _PillToggle(
                             options: const ['Direct activity', 'Contamination'],
                             selectedIndex: useContaminationInput ? 1 : 0,
-                            onChanged: (i) => setState(() {
-                              useContaminationInput = i == 1;
-                            }),
+                            onChanged: (i) {
+                              setState(() {
+                                useContaminationInput = i == 1;
+                              });
+                              // Recalculate so results track the active mode
+                              if (useContaminationInput) {
+                                calculateContamination();
+                              } else {
+                                calculate();
+                              }
+                            },
                             accent: _accent,
                             surface3: surface3,
                             cardBorder: cardBorder,
@@ -1283,6 +1340,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                   labelText: 'Contamination (dpm/100cm²)',
                                   isDense: true,
                                 ),
+                                inputFormatters: [_NonNegativeFormatter()],
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
@@ -1294,16 +1352,33 @@ class ContainmentTabState extends State<ContainmentTab>
                             Expanded(
                               child: TextField(
                                 controller: areaController,
-                                decoration: const InputDecoration(
-                                  labelText: 'Area (ft²)',
+                                decoration: InputDecoration(
+                                  labelText:
+                                      'Area (${areaInCm2 ? 'cm²' : 'ft²'})',
                                   isDense: true,
                                 ),
+                                inputFormatters: [_NonNegativeFormatter()],
                                 keyboardType:
                                     const TextInputType.numberWithOptions(
                                       decimal: true,
                                     ),
                                 onChanged: (_) => calculateContamination(),
                               ),
+                            ),
+                            const SizedBox(width: 8),
+                            _PillToggle(
+                              options: const ['ft²', 'cm²'],
+                              selectedIndex: areaInCm2 ? 1 : 0,
+                              onChanged: (i) {
+                                setState(() {
+                                  areaInCm2 = i == 1;
+                                });
+                                calculateContamination();
+                              },
+                              accent: _accent,
+                              surface3: surface3,
+                              cardBorder: cardBorder,
+                              ink2: ink2,
                             ),
                           ],
                         ),
@@ -1343,6 +1418,7 @@ class ContainmentTabState extends State<ContainmentTab>
                             labelText: 'Total activity (µCi)',
                             isDense: true,
                           ),
+                          inputFormatters: [_NonNegativeFormatter()],
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
@@ -1363,32 +1439,35 @@ class ContainmentTabState extends State<ContainmentTab>
                               letterSpacing: 0.3,
                             ),
                           ),
-                          GestureDetector(
-                            onTap: addNuclideRow,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              decoration: BoxDecoration(
-                                color: surface3,
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: cardBorder),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.add, size: 13, color: _accent),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Add nuclide',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: _accent,
+                          MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              onTap: addNuclideRow,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: surface3,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: cardBorder),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.add, size: 13, color: _accent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Add nuclide',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: _accent,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1481,18 +1560,23 @@ class ContainmentTabState extends State<ContainmentTab>
                                           builder: (ctx, constraints) => RawAutocomplete<String>(
                                             textEditingController:
                                                 item.nameController,
-                                            focusNode: FocusNode(),
+                                            focusNode: item.nameFocusNode,
                                             optionsBuilder: (tv) {
                                               if (NuclideData.dacValues
                                                       .containsKey(tv.text) &&
                                                   item.name != tv.text) {
                                                 WidgetsBinding.instance
-                                                    .addPostFrameCallback(
-                                                      (_) => updateNuclide(
+                                                    .addPostFrameCallback((_) {
+                                                      if (!mounted) return;
+                                                      if (idx >=
+                                                          sourceTerm.length) {
+                                                        return;
+                                                      }
+                                                      updateNuclide(
                                                         idx,
                                                         tv.text,
-                                                      ),
-                                                    );
+                                                      );
+                                                    });
                                               }
                                               return tv.text.isEmpty
                                                   ? NuclideData.dacValues.keys
@@ -1586,6 +1670,9 @@ class ContainmentTabState extends State<ContainmentTab>
                                             isDense: true,
                                             border: InputBorder.none,
                                           ),
+                                          inputFormatters: [
+                                            _NonNegativeFormatter(),
+                                          ],
                                           keyboardType:
                                               const TextInputType.numberWithOptions(
                                                 decimal: true,
@@ -1624,6 +1711,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                     SizedBox(
                                       width: 36,
                                       child: IconButton(
+                                        tooltip: 'Remove nuclide',
                                         icon: Icon(
                                           Icons.remove_circle_outline,
                                           size: 16,
@@ -1636,7 +1724,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                   ],
                                 ),
                               );
-                            }).toList(),
+                            }),
                           ],
                         ),
                       ),
@@ -1730,6 +1818,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                     isDense: true,
                                     errorText: frError ? 'Out of range' : null,
                                   ),
+                                  inputFormatters: [_NonNegativeFormatter()],
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                         decimal: true,
@@ -1823,6 +1912,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                     isDense: true,
                                     errorText: faError ? 'Out of range' : null,
                                   ),
+                                  inputFormatters: [_NonNegativeFormatter()],
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                         decimal: true,
@@ -1859,6 +1949,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                     isDense: true,
                                     helperText: 'Typical: 1×10⁶–1×10⁹ cm³',
                                   ),
+                                  inputFormatters: [_NonNegativeFormatter()],
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                         decimal: true,
@@ -1893,6 +1984,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                       return null;
                                     }(),
                                   ),
+                                  inputFormatters: [_NonNegativeFormatter()],
                                   keyboardType:
                                       const TextInputType.numberWithOptions(
                                         decimal: true,
@@ -2243,55 +2335,52 @@ class ContainmentTabState extends State<ContainmentTab>
                           ),
                         ),
                         const SizedBox(height: 10),
-                        ...nuclideContribs
-                            .map(
-                              (n) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                        ...nuclideContribs.map(
+                          (n) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          n.name,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                            color: ink1,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                        const Spacer(),
-                                        Text(
-                                          n.contrib.toStringAsExponential(2),
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: ink3,
-                                            fontFamily: 'monospace',
-                                          ),
-                                        ),
-                                      ],
+                                    Text(
+                                      n.name,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: ink1,
+                                        fontFamily: 'monospace',
+                                      ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(2),
-                                      child: LinearProgressIndicator(
-                                        value: n.pct / 100,
-                                        minHeight: 4,
-                                        backgroundColor: cardBorder,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              (isSufficient ?? true)
-                                                  ? _accent
-                                                  : _danger,
-                                            ),
+                                    const Spacer(),
+                                    Text(
+                                      n.contrib.toStringAsExponential(2),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: ink3,
+                                        fontFamily: 'monospace',
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            )
-                            .toList(),
+                                const SizedBox(height: 4),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                    value: n.pct / 100,
+                                    minHeight: 4,
+                                    backgroundColor: cardBorder,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      (isSufficient ?? true)
+                                          ? _accent
+                                          : _danger,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -2335,22 +2424,28 @@ class _PillToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: options.asMap().entries.map((e) {
           final selected = e.key == selectedIndex;
-          return GestureDetector(
-            onTap: () => onChanged(e.key),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              margin: const EdgeInsets.all(3),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: selected ? accent : Colors.transparent,
-                borderRadius: BorderRadius.circular(5),
-              ),
-              child: Text(
-                e.value,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? Colors.white : ink2,
+          return MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => onChanged(e.key),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                margin: const EdgeInsets.all(3),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: selected ? accent : Colors.transparent,
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  e.value,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: selected ? Colors.white : ink2,
+                  ),
                 ),
               ),
             ),
@@ -2467,6 +2562,7 @@ class _PifNumberField extends StatelessWidget {
         TextField(
           controller: controller,
           decoration: const InputDecoration(isDense: true),
+          inputFormatters: [_NonNegativeFormatter()],
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           onChanged: onChanged,
         ),

@@ -1,16 +1,19 @@
-import 'dart:convert';
-import 'dart:html' as html;
+import 'dart:js_interop';
+
+import 'package:web/web.dart' as web;
 
 Future<void> downloadJson(String content, String filename) async {
-  final bytes = utf8.encode(content);
-  final blob = html.Blob([bytes]);
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  final anchor = html.document.createElement('a') as html.AnchorElement
+  final blob = web.Blob(
+    [content.toJS].toJS,
+    web.BlobPropertyBag(type: 'application/json'),
+  );
+  final url = web.URL.createObjectURL(blob);
+  final anchor = web.HTMLAnchorElement()
     ..href = url
     ..style.display = 'none'
     ..download = filename;
-  html.document.body?.children.add(anchor);
+  web.document.body?.appendChild(anchor);
   anchor.click();
-  html.document.body?.children.remove(anchor);
-  html.Url.revokeObjectUrl(url);
+  anchor.remove();
+  web.URL.revokeObjectURL(url);
 }

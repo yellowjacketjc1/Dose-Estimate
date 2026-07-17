@@ -26,7 +26,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Windows release
-        run: flutter build windows --release --build-name=1.1.0 --build-number=1
+        run: flutter build windows --release --build-name=1.2.0 --build-number=1
 
       - name: Install Inno Setup
         run: choco install innosetup --yes
@@ -37,11 +37,11 @@ jobs:
           $script = @'
           [Setup]
           AppName=Dose Estimate
-          AppVersion=1.1.0 Beta
+          AppVersion=1.2.0 Beta
           AppPublisher=742 CHP
           DefaultDirName={userpf}\DoseEstimate
           DefaultGroupName=Dose Estimate
-          OutputBaseFilename=DoseEstimate-Beta-1.1-Setup
+          OutputBaseFilename=DoseEstimate-Beta-1.2-Setup
           OutputDir=installer
           Compression=lzma2
           SolidCompression=yes
@@ -71,35 +71,44 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: DoseEstimate-Beta-1.1-Windows
-          path: installer/DoseEstimate-Beta-1.1-Setup.exe
+          name: DoseEstimate-Beta-1.2-Windows
+          path: installer/DoseEstimate-Beta-1.2-Setup.exe
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: "Dose Estimate Beta Version 1.1"
+          name: "Dose Estimate Beta Version 1.2"
           body: |
-            ## Dose Estimate — Beta Version 1.1
+            ## Dose Estimate — Beta Version 1.2
 
-            ### What's New
-            - Formula display (Σ button) on each section — shows the math with values substituted in
-            - Windows splash screen with app icon on launch
-            - Check for Updates with auto-download and install
-            - WCD (Work Control Document) replaces Work Order label
-            - Section notes, mPIF typeahead dropdowns, containment auto-populate
-            - Extremity dosimetry badge, undo deleted task, ft² area input
-            - Custom C value, release fraction justification, mixing factor hints
-            - Incompatible C/PF warning, comma-formatted numbers
+            ### Corrections & safety fixes
+            - Fixed containment "BIOASSAY REQUIRED" showing when the result is not evaluable (encapsulated material, empty source term, or unset factor)
+            - Extremity assessments with any nuclide now save and reload correctly (previously the whole file could be rejected on load)
+            - Formula dialogs now show the 15% respirator penalty step, so the displayed math matches the totals
+            - ALARA 500 mrem trigger now uses one consistent basis (summed across tasks) on screen and in the PDF, and the PDF criteria table lists every trigger that fired
+            - Contamination-derived activity no longer stays stale when inputs are cleared; the custom confinement (C) value is now visible after loading a file
+            - A nuclide row with no radionuclide selected no longer inflates dose numbers
+
+            ### New in this release
+            - **Preparer field** in the header — your name flows onto the printed report
+            - **Calendar date picker** for the project date
+            - Header fields (WCD, Description, Date, Preparer) redesigned to make required entries obvious
+            - Choose **ft² or cm²** for the containment area/activity calculation
+            - Clearer sidebar labels ("after engineering controls", "after respiratory protection")
+
+            ### Under the hood
+            - Core dose and containment math extracted into a tested calculation engine (33 unit tests)
+            - Consistent dark-mode theming, keyboard shortcuts (Ctrl+S / O / P), and negative-input guards
 
             ### Installation
-            1. Download `DoseEstimate-Beta-1.1-Setup.exe`
+            1. Download `DoseEstimate-Beta-1.2-Setup.exe`
             2. Run the installer — **no admin rights required**
             3. A desktop shortcut will be created automatically
 
             ### Notes
             - Installs to your personal user folder (no system-wide install needed)
             - Windows 10 or later recommended
-          files: installer/DoseEstimate-Beta-1.1-Setup.exe
+          files: installer/DoseEstimate-Beta-1.2-Setup.exe
           draft: false
           prerelease: true
