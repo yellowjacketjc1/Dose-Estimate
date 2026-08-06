@@ -22,6 +22,11 @@ const double mremPerDacYear = 5000.0;
 /// Respirator work-rate penalty applied to time-based doses when PFR > 1.
 const double respiratorTimePenalty = 1.15;
 
+/// Individual extremity/skin dose (mrem) at or above which extremity ring
+/// dosimetry is required. Distinct from — and far below — the 5,000 mrem
+/// ALARA extremity review trigger (alara3).
+const double extremityDosimetryThresholdMrem = 500.0;
+
 /// Conservative alpha/spontaneous-fission default DAC (µCi/mL) for named
 /// nuclides that are missing from the DAC table. Matches NuclideData.getDac.
 const double defaultAlphaDac = 2e-13;
@@ -63,11 +68,39 @@ double getDAC(NuclideEntry n) {
   return NuclideData.dacValues[n.name] ?? defaultAlphaDac;
 }
 
+/// Alpha- and spontaneous-fission-emitting nuclides in the DAC table that are
+/// not matched by the explicit name checks in [getAppendixDBaseLevel].
+///
+/// 10 CFR 835 Appendix D defines its 1,000 dpm/100 cm² row as "beta-gamma
+/// emitters (nuclides with decay modes other than alpha emission or
+/// spontaneous fission)", so an alpha emitter must never fall through to it.
+/// These are grouped with the transuranics at 20 dpm/100 cm² — the
+/// conservative choice, and the row most of them belong to as members of the
+/// Ra-226/Ac-227/Th-229 decay chains.
+const Set<String> alphaEmittersNotNamedInAppendixD = {
+  'GD-148',
+  'ND-144',
+  'PB-210', // Ra-226 chain
+  'PO-208',
+  'PO-209',
+  'PO-210', // Ra-226 chain
+  'RA-225', // Ac-227/Th-229 chain
+  'SM-147',
+  'TH-227', // Ac-227 chain
+  'TH-229',
+  'U-230',
+  'U-233',
+};
+
 /// Appendix D base contamination level (dpm/100cm²) for the removable
 /// contamination trigger. The ALARA trigger fires above 1,000 × this level.
 double getAppendixDBaseLevel(NuclideEntry n) {
   final name = n.name?.toUpperCase();
   if (name == null) return 100.0; // Default if no nuclide selected
+
+  // "Other" carries a user-supplied DAC and an unknown decay mode; treat it
+  // conservatively rather than as a beta-gamma emitter.
+  if (name == 'OTHER') return 20.0;
 
   // U-nat, U-235, U-238, and associated decay products
   if (name.contains('U-NAT') ||
@@ -94,7 +127,10 @@ double getAppendixDBaseLevel(NuclideEntry n) {
       name.startsWith('CM-') ||
       name.startsWith('NP-') ||
       name.startsWith('BK-') ||
-      name.startsWith('CF-')) {
+      name.startsWith('CF-') ||
+      name.startsWith('ES-') ||
+      name.startsWith('FM-') ||
+      alphaEmittersNotNamedInAppendixD.contains(name)) {
     return 20.0;
   }
 

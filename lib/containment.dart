@@ -629,12 +629,34 @@ class ContainmentTabState extends State<ContainmentTab>
 
   Future<void> printContainmentReport() async {
     try {
-      final pdf = pw.Document();
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.letter,
-          build: (pw.Context context) {
-            return pw.Column(
+      final pdf = buildContainmentReportDocument();
+
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'containment_analysis.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
+      }
+    }
+  }
+
+  /// Builds the containment report. Split out from [printContainmentReport]
+  /// so the layout can be generated and inspected without a printer.
+  pw.Document buildContainmentReportDocument() {
+    final pdf = pw.Document();
+    // MultiPage (not Page): the source-term list is unbounded, so a report
+    // with many nuclides would otherwise push the containment verdict and
+    // bioassay assessment off the bottom of a fixed sheet.
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.letter,
+        build: (pw.Context context) {
+          return [
+            pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
                 // Header
@@ -855,9 +877,12 @@ class ContainmentTabState extends State<ContainmentTab>
                       crossAxisAlignment: pw.CrossAxisAlignment.start,
                       children: [
                         pw.Text(
+                          // No ✓/✗ here: they are absent from the PDF base
+                          // font and print as blank boxes. Colour and wording
+                          // already carry the verdict.
                           isSufficient!
-                              ? 'CONTAINMENT SUFFICIENT ✓'
-                              : 'CONTAINMENT NOT SUFFICIENT ✗',
+                              ? 'CONTAINMENT SUFFICIENT'
+                              : 'CONTAINMENT NOT SUFFICIENT',
                           style: pw.TextStyle(
                             fontSize: 12,
                             fontWeight: pw.FontWeight.bold,
@@ -885,7 +910,7 @@ class ContainmentTabState extends State<ContainmentTab>
                       ),
                     ),
                     child: pw.Text(
-                      'Containment result not evaluable — verify total activity, '
+                      'Containment result not evaluable - verify total activity, '
                       'room parameters, and that every source-term row with a '
                       'fraction > 0 has a recognized nuclide (DAC).',
                       style: const pw.TextStyle(fontSize: 10),
@@ -970,7 +995,7 @@ class ContainmentTabState extends State<ContainmentTab>
                         pw.SizedBox(height: 8),
                         pw.Text(
                           bioassayRequired!
-                              ? 'BIOASSAY REQUIRED ✓'
+                              ? 'BIOASSAY REQUIRED'
                               : 'BIOASSAY NOT REQUIRED',
                           style: pw.TextStyle(
                             fontSize: 11,
@@ -994,29 +1019,20 @@ class ContainmentTabState extends State<ContainmentTab>
                       ),
                     ),
                     child: pw.Text(
-                      'Bioassay assessment not evaluable — requires a release '
+                      'Bioassay assessment not evaluable - requires a release '
                       'pathway (PIF > 0) and a resolved source term.',
                       style: const pw.TextStyle(fontSize: 10),
                     ),
                   ),
                 ],
               ],
-            );
-          },
-        ),
-      );
+            ),
+          ];
+        },
+      ),
+    );
 
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'containment_analysis.pdf',
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to generate PDF: $e')));
-      }
-    }
+    return pdf;
   }
 
   // ─── Design token shorthands (warm-gray system from main.dart) ───────────

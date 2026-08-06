@@ -88,6 +88,84 @@ void main() {
       expect(getAppendixDBaseLevel(NuclideEntry(name: 'Cs-137')), 1000.0);
       expect(getAppendixDBaseLevel(NuclideEntry()), 100.0);
     });
+
+    test('every nuclide named in Appendix D keeps its regulation row', () {
+      const named = {
+        'U-235': 1000.0,
+        'U-238': 1000.0,
+        'Ra-226': 20.0,
+        'Ra-228': 20.0,
+        'Th-230': 20.0,
+        'Th-228': 20.0,
+        'Pa-231': 20.0,
+        'Ac-227': 20.0,
+        'I-125': 20.0,
+        'I-129': 20.0,
+        'Pu-239': 20.0,
+        'Am-241': 20.0,
+        'Cm-244': 20.0,
+        'Np-237': 20.0,
+        'Th-232': 200.0,
+        'Sr-90': 200.0,
+        'Ra-223': 200.0,
+        'Ra-224': 200.0,
+        'U-232': 200.0,
+        'I-126': 200.0,
+        'I-131': 200.0,
+        'I-133': 200.0,
+        'H-3': 10000.0,
+      };
+      named.forEach((name, level) {
+        expect(
+          getAppendixDBaseLevel(NuclideEntry(name: name)),
+          level,
+          reason: '$name must map to the $level dpm/100cm² Appendix D row',
+        );
+      });
+    });
+
+    test('alpha emitters never fall through to the beta-gamma row', () {
+      // Appendix D's 1,000 dpm row is explicitly "nuclides with decay modes
+      // other than alpha emission or spontaneous fission".
+      for (final name in alphaEmittersNotNamedInAppendixD) {
+        expect(
+          getAppendixDBaseLevel(NuclideEntry(name: name)),
+          20.0,
+          reason: '$name is an alpha emitter and must not use 1,000 dpm',
+        );
+      }
+      // Case-insensitive, matching how names are stored in the DAC table.
+      expect(getAppendixDBaseLevel(NuclideEntry(name: 'Po-210')), 20.0);
+      expect(getAppendixDBaseLevel(NuclideEntry(name: 'Pb-210')), 20.0);
+    });
+
+    test('Other uses the conservative row, not beta-gamma', () {
+      expect(getAppendixDBaseLevel(NuclideEntry(name: 'Other')), 20.0);
+    });
+  });
+
+  group('extremity dosimetry threshold', () {
+    test('ring dosimetry threshold is 500 mrem, well below alara3', () {
+      // Ring dosimetry is a separate, much lower bar than the 5,000 mrem
+      // ALARA extremity review trigger.
+      expect(extremityDosimetryThresholdMrem, 500.0);
+      expect(
+        extremityDosimetryThresholdMrem,
+        lessThan(5000.0),
+        reason: 'dosimetry must trigger before the ALARA extremity review',
+      );
+    });
+
+    test('500 mrem individual extremity does not fire alara3', () {
+      // The dose that requires a ring must not by itself demand ALARA review.
+      final t = referenceTask(
+        workers: 1,
+        extremities: [ExtremityEntry(doseRate: 250, time: 2)], // 500 mrem
+      );
+      final totals = calculateTaskTotals(t);
+      expect(totals['individualExtremity'], closeTo(500.0, 1e-9));
+      expect(computeGlobalTriggers([t])['alara3'], isFalse);
+    });
   });
 
   group('computeNuclideDose', () {
