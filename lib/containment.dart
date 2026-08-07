@@ -1812,7 +1812,12 @@ class ContainmentTabState extends State<ContainmentTab>
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
+                          // Loose fit, not Expanded: the pills take only the
+                          // width they need so the fr field sits beside them
+                          // instead of being pushed to the far edge. Still
+                          // wraps rather than overflowing on narrow windows.
+                          Flexible(
+                            fit: FlexFit.loose,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
