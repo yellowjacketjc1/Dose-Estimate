@@ -19,6 +19,7 @@ import 'qa_loader_stub.dart'
 import 'nuclides.dart';
 import 'models/task_data.dart';
 import 'calc/dose_calculator.dart' as calc;
+import 'pdf_text.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 
 // Re-export the models so existing importers of main.dart (e.g. tests)
@@ -2778,12 +2779,17 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
     final now = DateTime.now();
     final genStr =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    // Every free-text field below is folded onto characters the report font
+    // can draw — see lib/pdf_text.dart. Word turns hyphens into em dashes on
+    // paste, which otherwise print as hollow boxes.
     final wo = workOrderController.text.isNotEmpty
-        ? workOrderController.text
+        ? pdfSafeText(workOrderController.text)
         : '-';
-    final dateStr = dateController.text.isNotEmpty ? dateController.text : '-';
-    final descStr = descriptionController.text;
-    final preparerStr = preparerController.text.trim();
+    final dateStr = dateController.text.isNotEmpty
+        ? pdfSafeText(dateController.text)
+        : '-';
+    final descStr = pdfSafeText(descriptionController.text);
+    final preparerStr = pdfSafeText(preparerController.text.trim());
     final nTasks = tasks.length;
 
     // ════════════════════════════════════════════════════════════════════
@@ -3391,7 +3397,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 final t = s['task'] as TaskData;
                 return pw.TableRow(
                   children: [
-                    _pdfTD(t.title),
+                    _pdfTD(pdfSafeText(t.title)),
                     _pdfTD(t.workers.toString(), align: pw.TextAlign.center),
                     _pdfTD(
                       t.hours.toStringAsFixed(1),
@@ -3593,7 +3599,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                             ),
                             pw.SizedBox(height: 1),
                             pw.Text(
-                              entry.value,
+                              pdfSafeText(entry.value),
                               style: pw.TextStyle(fontSize: 8, color: _pdfInk2),
                             ),
                             pw.SizedBox(height: 5),
@@ -3659,7 +3665,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                   pw.TableRow(
                     children: [
                       pw.Text(
-                        'Task ${i + 1} of ${taskSummaries.length} - ${t.title}',
+                        'Task ${i + 1} of ${taskSummaries.length} - ${pdfSafeText(t.title)}',
                         style: pw.TextStyle(
                           fontSize: 12,
                           fontWeight: pw.FontWeight.bold,
@@ -3698,7 +3704,7 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
                   pw.Text(
-                    '${t.title}  |  ${t.location}',
+                    '${pdfSafeText(t.title)}  |  ${pdfSafeText(t.location)}',
                     style: pw.TextStyle(
                       fontSize: 14,
                       fontWeight: pw.FontWeight.bold,
@@ -4348,10 +4354,11 @@ class DoseEstimateScreenState extends State<DoseEstimateScreen>
         noteEntries.add({
           'task':
               // ASCII separators only — the PDF base font has no em-dash or
-              // middle-dot glyph and prints them as empty boxes.
-              'Task ${ti + 1}${t.title.isNotEmpty ? " - ${t.title}" : ""}',
+              // middle-dot glyph and prints them as empty boxes. The title and
+              // the note are folded for the same reason.
+              'Task ${ti + 1}${t.title.isNotEmpty ? " - ${pdfSafeText(t.title)}" : ""}',
           'section': sectionNames[entry.key] ?? entry.key,
-          'note': entry.value.trim(),
+          'note': pdfSafeText(entry.value.trim()),
         });
       }
     }
