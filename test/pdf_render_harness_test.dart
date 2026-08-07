@@ -62,14 +62,23 @@ Future<List<int>> renderScenario(
   final key = GlobalKey<DoseEstimateScreenState>();
   await tester.pumpWidget(
     MaterialApp(
-      home: DoseEstimateScreen(key: key, initialState: state),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: SizedBox(
+            height: 4000,
+            child: DoseEstimateScreen(key: key, initialState: state),
+          ),
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
-  // Laying the full app screen out in a headless viewport raises overflow /
-  // material-ancestor errors that say nothing about the generated report.
-  // The report is built from model state, not from the rendered widgets.
-  tester.takeException();
+  // Laying the full app screen out in a headless viewport raises layout
+  // errors that say nothing about the generated report, which is built from
+  // model state rather than the rendered widgets. takeException() returns one
+  // exception per call, so drain them all — a single call leaves the rest to
+  // fail the test.
+  while (tester.takeException() != null) {}
 
   List<int>? captured;
   await tester.runAsync(() async {

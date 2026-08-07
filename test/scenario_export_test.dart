@@ -64,6 +64,17 @@ class Scenario {
   const Scenario(this.folder, this.dose, this.containment);
 }
 
+/// Discards every pending layout exception raised by laying the full app
+/// screen out in a headless viewport.
+///
+/// `takeException()` returns one exception per call, and the screen can raise
+/// several per pump, so a single call leaves the rest to fail the test. These
+/// say nothing about the generated report, which is built from model state
+/// rather than from the rendered widgets.
+void drainLayoutExceptions(WidgetTester tester) {
+  while (tester.takeException() != null) {}
+}
+
 Future<void> writeDose(
   WidgetTester tester,
   Scenario s,
@@ -72,11 +83,18 @@ Future<void> writeDose(
   final key = GlobalKey<DoseEstimateScreenState>();
   await tester.pumpWidget(
     MaterialApp(
-      home: DoseEstimateScreen(key: key, initialState: s.dose),
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: SizedBox(
+            height: 4000,
+            child: DoseEstimateScreen(key: key, initialState: s.dose),
+          ),
+        ),
+      ),
     ),
   );
   await tester.pumpAndSettle();
-  tester.takeException(); // headless-viewport layout noise
+  drainLayoutExceptions(tester);
 
   final expected = (s.dose['tasks'] as List).length;
   expect(
@@ -109,11 +127,11 @@ Future<void> writeContainment(
     ),
   );
   await tester.pumpAndSettle();
-  tester.takeException();
+  drainLayoutExceptions(tester);
 
   key.currentState!.importState(s.containment);
   await tester.pumpAndSettle();
-  tester.takeException();
+  drainLayoutExceptions(tester);
 
   List<int>? bytes;
   await tester.runAsync(() async {

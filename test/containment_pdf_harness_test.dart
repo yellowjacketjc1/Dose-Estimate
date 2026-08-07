@@ -33,7 +33,8 @@ void main() {
     );
     await tester.pumpAndSettle();
     // Headless-viewport layout errors say nothing about the generated report.
-    tester.takeException();
+    // Drain them all: takeException() returns only one per call.
+    while (tester.takeException() != null) {}
 
     // A long, realistic source term — the case that overflowed a fixed page.
     const names = [
@@ -69,7 +70,7 @@ void main() {
       ],
     });
     await tester.pumpAndSettle();
-    tester.takeException();
+    while (tester.takeException() != null) {}
 
     List<int>? bytes;
     await tester.runAsync(() async {
