@@ -1386,8 +1386,22 @@ class ContainmentTabState extends State<ContainmentTab>
                               options: const ['ft²', 'cm²'],
                               selectedIndex: areaInCm2 ? 1 : 0,
                               onChanged: (i) {
+                                final toCm2 = i == 1;
+                                // Re-tapping the selected unit must not convert
+                                // again, or the area drifts by 929× per tap.
+                                if (toCm2 == areaInCm2) return;
                                 setState(() {
-                                  areaInCm2 = i == 1;
+                                  areaInCm2 = toCm2;
+                                  // Convert the entered area so the physical
+                                  // area — and the derived activity — stay put.
+                                  final entered = double.tryParse(
+                                    areaController.text,
+                                  );
+                                  if (entered != null && entered > 0) {
+                                    areaController.text = calc.formatArea(
+                                      calc.convertArea(entered, toCm2: toCm2),
+                                    );
+                                  }
                                 });
                                 calculateContamination();
                               },
@@ -1963,7 +1977,7 @@ class ContainmentTabState extends State<ContainmentTab>
                                   controller: volumeController,
                                   decoration: const InputDecoration(
                                     isDense: true,
-                                    helperText: 'Typical: 1×10⁶–1×10⁹ cm³',
+                                    helperText: 'Typical: 1×10⁶–2×10⁸ cm³',
                                   ),
                                   inputFormatters: [_NonNegativeFormatter()],
                                   keyboardType:
@@ -2200,36 +2214,13 @@ class ContainmentTabState extends State<ContainmentTab>
                 decoration: BoxDecoration(
                   border: Border(bottom: BorderSide(color: cardBorder)),
                 ),
-                child: Row(
-                  children: [
-                    Text(
-                      'Assessment',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: ink1,
-                      ),
-                    ),
-                    const Spacer(),
-                    Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                        color: _ok,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'LIVE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: _ok,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  'Assessment',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: ink1,
+                  ),
                 ),
               ),
 

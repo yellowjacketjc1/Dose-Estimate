@@ -1,0 +1,18 @@
+Dose Estimate — Windows Installation Instructions
+====================================================
+
+Requirements:
+  - Windows 10 or later
+
+Steps:
+  1. Run DoseEstimate-1.0.0-Setup.exe
+     - No administrator rights are required.
+     - The app installs to your personal user folder (not a system-wide location).
+  2. A desktop shortcut is created automatically.
+  3. Launch Dose Estimate from the desktop shortcut or Start menu.
+
+Updating:
+  Dose Estimate checks for updates on launch. When a new version is
+  available, you can install it directly from within the app, or run a
+  newer installer over the existing install — your saved task files will
+  be kept.

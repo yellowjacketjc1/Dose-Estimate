@@ -40,6 +40,38 @@ double? activityFromContamination(
   return totalDpm / dpmPerMicroCurie;
 }
 
+/// Converts an area between ft² and cm² so the physical area is preserved when
+/// the user flips the unit toggle.
+///
+/// Without this, switching units silently reinterprets the entered number as
+/// the other unit — a 929× error in the derived activity.
+double convertArea(double area, {required bool toCm2}) =>
+    toCm2 ? area * cm2PerFt2 : area / cm2PerFt2;
+
+/// Formats a converted area for display in the entry field.
+///
+/// Plain decimal at a readable precision, with trailing zeros trimmed, so a
+/// converted value doesn't come back as float noise (`3716.1200000000003`) or
+/// in exponential form the user then has to retype.
+String formatArea(double area) {
+  if (!area.isFinite) return '';
+  if (area == 0) return '0';
+  final abs = area.abs();
+  String s;
+  if (abs >= 1000) {
+    s = area.toStringAsFixed(1);
+  } else if (abs >= 1) {
+    s = area.toStringAsFixed(3);
+  } else {
+    // Small ft² values need more decimals to survive a round trip.
+    s = area.toStringAsFixed(6);
+  }
+  if (s.contains('.')) {
+    s = s.replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
+  }
+  return s;
+}
+
 // ─── PIF ─────────────────────────────────────────────────────────────────────
 
 /// PIF = R × C × D × O × S × U × 1e-6.

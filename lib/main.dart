@@ -7318,7 +7318,7 @@ class _TaskRightRail extends StatelessWidget {
                           unit: 'mrem',
                           level: indivLevel,
                           sub:
-                              'External ${formatNumber(indivExt)} · Internal ${formatNumber(indivInt)} · of 500 limit',
+                              'External ${formatNumber(indivExt)} mrem · Internal ${formatNumber(indivInt)} mrem · of 500 mrem limit',
                         ),
                         SizedBox(height: 4),
                         progressBar(indivPct, indivLevel),
@@ -7328,7 +7328,7 @@ class _TaskRightRail extends StatelessWidget {
                           formatNumber(collEff),
                           unit: 'p-mrem',
                           level: collLevel,
-                          sub: 'of 750 ALARA threshold',
+                          sub: 'of 750 p-mrem ALARA threshold',
                         ),
                         SizedBox(height: 4),
                         progressBar(collPct, collLevel),
@@ -7394,10 +7394,12 @@ class _TaskRightRail extends StatelessWidget {
                     metric(
                       'External (collective)',
                       formatNumber(totals['collectiveExternal'] ?? 0.0),
+                      unit: 'p-mrem',
                     ),
                     metric(
                       'Internal (collective)',
                       formatNumber(totals['collectiveInternal'] ?? 0.0),
+                      unit: 'p-mrem',
                     ),
                     if ((totals['respiratorPenalty'] ?? 1.0) > 1.0)
                       Padding(

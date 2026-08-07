@@ -3,6 +3,58 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:dose_dart_version/calc/containment_calculator.dart';
 
 void main() {
+  group('convertArea', () {
+    test('ft² → cm² multiplies by 929.03', () {
+      expect(convertArea(10, toCm2: true), closeTo(9290.3, 1e-9));
+    });
+
+    test('cm² → ft² divides by 929.03', () {
+      expect(convertArea(9290.3, toCm2: false), closeTo(10, 1e-9));
+    });
+
+    test('round trip preserves the value', () {
+      final there = convertArea(4, toCm2: true);
+      expect(convertArea(there, toCm2: false), closeTo(4, 1e-12));
+    });
+
+    test('derived activity is unchanged by a unit switch', () {
+      // The point of the conversion: flipping the toggle must not move the
+      // computed activity.
+      const contam = 25000.0;
+      final beforeUci = activityFromContamination(
+        contam,
+        4,
+        areaInCm2: false,
+      )!;
+      final afterUci = activityFromContamination(
+        contam,
+        convertArea(4, toCm2: true),
+        areaInCm2: true,
+      )!;
+      expect(afterUci, closeTo(beforeUci, 1e-12));
+    });
+  });
+
+  group('formatArea', () {
+    test('trims float noise and trailing zeros', () {
+      expect(formatArea(convertArea(4, toCm2: true)), '3716.1');
+      expect(formatArea(10), '10');
+    });
+
+    test('keeps small ft² values readable, not exponential', () {
+      final ft2 = convertArea(1, toCm2: false); // ~0.001076
+      final s = formatArea(ft2);
+      expect(s.contains('e'), isFalse);
+      expect(double.parse(s), closeTo(ft2, 1e-6));
+    });
+
+    test('handles zero and non-finite input', () {
+      expect(formatArea(0), '0');
+      expect(formatArea(double.infinity), '');
+      expect(formatArea(double.nan), '');
+    });
+  });
+
   group('activityFromContamination', () {
     test('ft² default converts at 929.03 cm²/ft²', () {
       // 1000 dpm/100cm² over 10 ft²:
