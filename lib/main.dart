@@ -7200,14 +7200,25 @@ class _TaskRightRail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w600,
-                    color: col,
-                    fontFamily: 'Courier',
-                    letterSpacing: -0.02,
+                // A long dose value (or wider font metrics on another
+                // platform) used to overflow this card and clip the unit.
+                // Shrink the number to fit instead.
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      value,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w600,
+                        color: col,
+                        fontFamily: 'Courier',
+                        letterSpacing: -0.02,
+                      ),
+                    ),
                   ),
                 ),
                 if (unit != null) ...[
