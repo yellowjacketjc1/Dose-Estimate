@@ -780,27 +780,37 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Brand mark
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20, right: 10),
-                      child: Row(
-                        children: [
-                          Image.asset(
-                            'assets/app_icon.png',
-                            width: 32,
-                            height: 32,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Dose Assessment',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: ink1,
-                              letterSpacing: -0.2,
+                    // Brand mark. Flexible + ellipsis so a narrow window
+                    // shrinks the title instead of overflowing the topbar Row,
+                    // which clipped the title and trailing controls outright.
+                    Flexible(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 20, right: 10),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/app_icon.png',
+                              width: 32,
+                              height: 32,
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 10),
+                            Flexible(
+                              child: Text(
+                                'Dose Assessment',
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: ink1,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

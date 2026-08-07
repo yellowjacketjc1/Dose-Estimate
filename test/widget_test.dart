@@ -17,5 +17,15 @@ void main() {
 
     // Verify that the topbar brand title is present.
     expect(find.text('Dose Assessment'), findsOneWidget);
+
+    // The topbar must not overflow at a normal desktop width. This is asserted
+    // explicitly because an overflowing Row clips its children: a few pixels
+    // of font-metric difference on a CI runner silently dropped the title and
+    // failed the check above with a confusing "found 0 widgets".
+    expect(
+      tester.takeException(),
+      isNull,
+      reason: 'topbar overflowed at 1440x900',
+    );
   });
 }
